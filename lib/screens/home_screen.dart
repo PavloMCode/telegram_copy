@@ -4,6 +4,17 @@ import 'chat_screen.dart';
 import 'settings_screen.dart';
 import 'contacts_screen.dart';
 
+abstract final class _HomeDrawerLayout {
+  static const width = 280.0;
+  static const headerHeight = 160.0;
+  static const avatarSize = 72.0;
+  static const itemHeight = 52.0;
+  static const iconSize = 22.0;
+  static const horizontalPadding = 16.0;
+  static const selectedRadius = 12.0;
+  static const headerGap = 12.0;
+}
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -176,6 +187,154 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _drawerItem(
+    ColorScheme colors, {
+    required String title,
+    required IconData icon,
+    required VoidCallback onTap,
+    bool selected = false,
+  }) => Padding(
+    // Split the 16 px inset between the background and its content.
+    padding: const EdgeInsets.symmetric(
+      horizontal: _HomeDrawerLayout.horizontalPadding / 2,
+    ),
+    child: SizedBox(
+      height: _HomeDrawerLayout.itemHeight,
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: _HomeDrawerLayout.horizontalPadding / 2,
+        ),
+        minLeadingWidth: _HomeDrawerLayout.iconSize,
+        horizontalTitleGap: _HomeDrawerLayout.horizontalPadding,
+        minTileHeight: _HomeDrawerLayout.itemHeight,
+        minVerticalPadding: 0,
+        visualDensity: VisualDensity.standard,
+        titleAlignment: ListTileTitleAlignment.center,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(_HomeDrawerLayout.selectedRadius),
+        ),
+        selected: selected,
+        selectedTileColor: colors.primaryContainer,
+        selectedColor: colors.onPrimaryContainer,
+        iconColor: colors.onSurfaceVariant,
+        textColor: colors.onSurface,
+        leading: Icon(icon, size: _HomeDrawerLayout.iconSize),
+        title: Text(
+          title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+          ),
+        ),
+        onTap: onTap,
+      ),
+    ),
+  );
+
+  Widget _drawer(ColorScheme colors) => Drawer(
+    width: _HomeDrawerLayout.width,
+    child: ListView(
+      padding: const EdgeInsets.only(bottom: 16),
+      children: [
+        ColoredBox(
+          color: colors.primary,
+          child: SafeArea(
+            bottom: false,
+            child: SizedBox(
+              height: _HomeDrawerLayout.headerHeight,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: _HomeDrawerLayout.horizontalPadding,
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    CircleAvatar(
+                      radius: _HomeDrawerLayout.avatarSize / 2,
+                      backgroundColor: colors.primaryContainer,
+                      child: Icon(
+                        Icons.person,
+                        size: 44,
+                        color: colors.onPrimaryContainer,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'My Name',
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 19,
+                        height: 1.2,
+                        fontWeight: FontWeight.w600,
+                        color: colors.onPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '+380 99 123 45 67',
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 15,
+                        height: 1.2,
+                        color: colors.onPrimaryMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: _HomeDrawerLayout.headerGap),
+        _drawerItem(
+          colors,
+          title: 'Chats',
+          icon: Icons.chat_bubble_outline_rounded,
+          selected: true,
+          onTap: () => Navigator.pop(context),
+        ),
+        _drawerItem(
+          colors,
+          title: 'Contacts',
+          icon: Icons.person_outline,
+          onTap: () => _open(const ContactsScreen(), fromDrawer: true),
+        ),
+        _drawerItem(
+          colors,
+          title: 'Saved Messages',
+          icon: Icons.bookmark_border,
+          onTap: () => _open(
+            const ChatScreen(chatId: 'saved', chatName: 'Saved Messages'),
+            fromDrawer: true,
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Divider(
+            height: 1,
+            thickness: 1,
+            indent: _HomeDrawerLayout.horizontalPadding,
+            endIndent: _HomeDrawerLayout.horizontalPadding,
+            color: colors.subtleDivider,
+          ),
+        ),
+        _drawerItem(
+          colors,
+          title: 'Settings',
+          icon: Icons.settings_outlined,
+          onTap: () => _open(const SettingsScreen(), fromDrawer: true),
+        ),
+      ],
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     final colors = AppTheme.colorsOf(context);
@@ -259,53 +418,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
         ],
       ),
-      drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            UserAccountsDrawerHeader(
-              decoration: BoxDecoration(color: colors.primary),
-              accountName: Text(
-                'My Name',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: colors.onPrimary,
-                ),
-              ),
-              accountEmail: Text(
-                '+380 99 123 45 67',
-                style: TextStyle(color: colors.onPrimary),
-              ),
-              currentAccountPicture: CircleAvatar(
-                backgroundColor: colors.primaryContainer,
-                child: Icon(
-                  Icons.person,
-                  size: 40,
-                  color: colors.onPrimaryContainer,
-                ),
-              ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.person_outline),
-              title: const Text('Contacts'),
-              onTap: () => _open(const ContactsScreen(), fromDrawer: true),
-            ),
-            ListTile(
-              leading: const Icon(Icons.bookmark_border),
-              title: const Text('Saved Messages'),
-              onTap: () => _open(
-                const ChatScreen(chatId: 'saved', chatName: 'Saved Messages'),
-                fromDrawer: true,
-              ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.settings_outlined),
-              title: const Text('Settings'),
-              onTap: () => _open(const SettingsScreen(), fromDrawer: true),
-            ),
-          ],
-        ),
-      ),
+      drawer: _drawer(colors),
       body: SafeArea(
         top: false,
         child: chats.isEmpty

@@ -59,6 +59,13 @@ void main() {
     );
   }
 
+  Future<void> attachFiles(WidgetTester tester) async {
+    await tester.tap(find.byTooltip('Attach files'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('File'));
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('Reaction can be added, replaced and removed', (tester) async {
     await openChat(tester);
     await tester.enterText(find.byType(TextField), 'Hello');
@@ -86,8 +93,7 @@ void main() {
   ) async {
     picker.files = [_TestFile('notes.pdf'), _TestFile('photo.png')];
     await openChat(tester);
-    await tester.tap(find.byTooltip('Attach files'));
-    await tester.pumpAndSettle();
+    await attachFiles(tester);
     expect(find.byType(InputChip), findsNWidgets(2));
     final chip = tester.widget<InputChip>(find.byType(InputChip).first);
     chip.onDeleted!();
@@ -108,13 +114,11 @@ void main() {
   testWidgets('Picker cancellation and failure preserve draft', (tester) async {
     await openChat(tester);
     await tester.enterText(find.byType(TextField), 'My caption');
-    await tester.tap(find.byTooltip('Attach files'));
-    await tester.pumpAndSettle();
+    await attachFiles(tester);
     expect(find.byType(InputChip), findsNothing);
     expect(find.text('My caption'), findsOneWidget);
     picker.fail = true;
-    await tester.tap(find.byTooltip('Attach files'));
-    await tester.pumpAndSettle();
+    await attachFiles(tester);
     expect(
       find.text('Could not attach files. Please try again.'),
       findsOneWidget,
@@ -139,8 +143,7 @@ void main() {
       _TestFile('a_very_long_filename_for_our_project_documentation.pdf'),
     ];
     await openChat(tester);
-    await tester.tap(find.byTooltip('Attach files'));
-    await tester.pumpAndSettle();
+    await attachFiles(tester);
     await tester.enterText(find.byType(TextField), 'Project files');
     await tester.tap(find.byTooltip('Send message'));
     await tester.pumpAndSettle();
