@@ -2,10 +2,23 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import '../services/auth_api.dart';
+import 'registration_screen.dart';
 import '../theme/app_theme.dart';
 
+abstract final class _AccountLayout {
+  static const avatarSize = 72.0;
+  static const cameraSize = 28.0;
+  static const fieldHeight = 48.0;
+  static const fieldRadius = 12.0;
+  static const fieldGap = 12.0;
+  static const pagePadding = 24.0;
+}
+
 class SettingsScreenAccount extends StatefulWidget {
-  const SettingsScreenAccount({super.key});
+  const SettingsScreenAccount({super.key, this.authApi});
+
+  final AuthApi? authApi;
 
   @override
   State<SettingsScreenAccount> createState() => _SettingsScreenAccountState();
@@ -16,6 +29,57 @@ class _SettingsScreenAccountState extends State<SettingsScreenAccount> {
   Uint8List? _avatarPhoto;
   bool _changingPhoto = false;
   bool _photoMenuOpen = false;
+  bool _loggingOut = false;
+
+  Future<void> _logOut() async {
+    if (_loggingOut) return;
+    FocusScope.of(context).unfocus();
+    setState(() => _loggingOut = true);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Log out?'),
+        content: const Text(
+          'You can sign in again with your email, password and verification code.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(
+              'Log out',
+              style: TextStyle(color: AppTheme.colorsOf(dialogContext).error),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    if (confirmed != true) {
+      setState(() => _loggingOut = false);
+      return;
+    }
+    try {
+      await (widget.authApi ?? AuthApi.instance).logout();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loggingOut = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not log out. Please try again.')),
+      );
+      return;
+    }
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(
+        builder: (_) => RegistrationScreen(authApi: widget.authApi),
+      ),
+      (_) => false,
+    );
+  }
 
   Future<void> _changePhoto() async {
     if (_changingPhoto || _photoMenuOpen) return;
@@ -94,15 +158,15 @@ class _SettingsScreenAccountState extends State<SettingsScreenAccount> {
 
   Widget _avatar(ColorScheme colors) => Center(
     child: SizedBox(
-      width: 96,
-      height: 96,
+      width: _AccountLayout.avatarSize + 16,
+      height: _AccountLayout.avatarSize + 16,
       child: Stack(
         children: [
           Positioned.fill(
             child: Padding(
               padding: const EdgeInsets.all(8),
               child: CircleAvatar(
-                radius: 40,
+                radius: _AccountLayout.avatarSize / 2,
                 backgroundColor: colors.primaryContainer,
                 foregroundImage: _avatarPhoto == null
                     ? null
@@ -110,7 +174,7 @@ class _SettingsScreenAccountState extends State<SettingsScreenAccount> {
                 child: _avatarPhoto == null
                     ? Icon(
                         Icons.person_outline_rounded,
-                        size: 44,
+                        size: 40,
                         color: colors.onPrimaryContainer,
                       )
                     : null,
@@ -127,22 +191,31 @@ class _SettingsScreenAccountState extends State<SettingsScreenAccount> {
                 foregroundColor: colors.onPrimary,
                 disabledBackgroundColor: colors.primary,
                 disabledForegroundColor: colors.onPrimary,
-                minimumSize: const Size(40, 40),
+                minimumSize: const Size(
+                  _AccountLayout.cameraSize,
+                  _AccountLayout.cameraSize,
+                ),
+                fixedSize: const Size(
+                  _AccountLayout.cameraSize,
+                  _AccountLayout.cameraSize,
+                ),
+                padding: EdgeInsets.zero,
+                tapTargetSize: MaterialTapTargetSize.padded,
                 shape: CircleBorder(
-                  side: BorderSide(color: colors.surface, width: 3),
+                  side: BorderSide(color: colors.surface, width: 2),
                 ),
               ),
               onPressed: _changingPhoto ? null : _changePhoto,
               icon: _changingPhoto
                   ? SizedBox(
-                      width: 20,
-                      height: 20,
+                      width: 14,
+                      height: 14,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
                         color: colors.onPrimary,
                       ),
                     )
-                  : const Icon(Icons.camera_alt_outlined, size: 20),
+                  : const Icon(Icons.camera_alt_outlined, size: 16),
             ),
           ),
         ],
@@ -151,7 +224,7 @@ class _SettingsScreenAccountState extends State<SettingsScreenAccount> {
   );
 
   Widget _section(String title, ColorScheme colors) => Padding(
-    padding: const EdgeInsets.only(bottom: 16),
+    padding: const EdgeInsets.only(bottom: 12),
     child: Text(
       title,
       style: TextStyle(
@@ -160,6 +233,11 @@ class _SettingsScreenAccountState extends State<SettingsScreenAccount> {
         fontSize: 13,
       ),
     ),
+  );
+
+  OutlineInputBorder _fieldBorder(BorderSide side) => OutlineInputBorder(
+    borderRadius: BorderRadius.circular(_AccountLayout.fieldRadius),
+    borderSide: side,
   );
 
   Widget _field(
@@ -174,41 +252,79 @@ class _SettingsScreenAccountState extends State<SettingsScreenAccount> {
     int maxLines = 1,
     bool last = false,
   }) => Padding(
-    padding: const EdgeInsets.only(bottom: 20),
-    child: Focus(
-      onFocusChange: (focused) => setState(() {
-        if (focused) {
-          _focusedFields.add(label);
-        } else {
-          _focusedFields.remove(label);
-        }
-      }),
-      child: TextFormField(
-        keyboardType:
-            keyboardType ??
-            (maxLines > 1 ? TextInputType.multiline : TextInputType.text),
-        textCapitalization: capitalization,
-        autofillHints: autofillHints,
-        minLines: 1,
-        maxLines: maxLines,
-        textInputAction: last
-            ? TextInputAction.done
-            : (maxLines > 1 ? TextInputAction.newline : TextInputAction.next),
-        decoration: InputDecoration(
-          labelText: label,
-          floatingLabelBehavior: FloatingLabelBehavior.always,
-          hintText: _focusedFields.contains(label) ? null : value,
-          prefixIcon: Icon(icon, color: colors.onSurfaceVariant),
-          helperText: helperText,
-          helperMaxLines: 2,
-          helperStyle: TextStyle(color: colors.secondaryText, fontSize: 12),
-          fillColor: colors.surfaceContainerLow,
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(color: colors.inputOutline),
+    padding: const EdgeInsets.only(bottom: _AccountLayout.fieldGap),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Focus(
+          onFocusChange: (focused) => setState(() {
+            if (focused) {
+              _focusedFields.add(label);
+            } else {
+              _focusedFields.remove(label);
+            }
+          }),
+          child: SizedBox(
+            height: _AccountLayout.fieldHeight,
+            child: TextFormField(
+              keyboardType:
+                  keyboardType ??
+                  (maxLines > 1 ? TextInputType.multiline : TextInputType.text),
+              textCapitalization: capitalization,
+              autofillHints: autofillHints,
+              minLines: 1,
+              maxLines: maxLines,
+              style: const TextStyle(fontSize: 14),
+              textInputAction: last
+                  ? TextInputAction.done
+                  : (maxLines > 1
+                        ? TextInputAction.newline
+                        : TextInputAction.next),
+              decoration: InputDecoration(
+                labelText: label,
+                floatingLabelBehavior: FloatingLabelBehavior.always,
+                hintText: _focusedFields.contains(label) ? null : value,
+                prefixIcon: Icon(
+                  icon,
+                  size: 20,
+                  color: colors.onSurfaceVariant,
+                ),
+                prefixIconConstraints: const BoxConstraints(
+                  minWidth: 44,
+                  minHeight: _AccountLayout.fieldHeight,
+                ),
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
+                fillColor: colors.surfaceContainerLow,
+                border: _fieldBorder(BorderSide.none),
+                enabledBorder: _fieldBorder(
+                  BorderSide(color: colors.inputOutline),
+                ),
+                focusedBorder: _fieldBorder(
+                  BorderSide(color: colors.primary, width: 2),
+                ),
+              ),
+            ),
           ),
         ),
-      ),
+        if (helperText != null)
+          Padding(
+            padding: const EdgeInsets.only(left: 12, top: 4),
+            child: Text(
+              helperText,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: colors.secondaryText,
+                fontSize: 11,
+                height: 1.2,
+              ),
+            ),
+          ),
+      ],
     ),
   );
 
@@ -219,7 +335,12 @@ class _SettingsScreenAccountState extends State<SettingsScreenAccount> {
       appBar: AppBar(title: const Text('Account')),
       body: ListView(
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
+        padding: const EdgeInsets.fromLTRB(
+          _AccountLayout.pagePadding,
+          24,
+          _AccountLayout.pagePadding,
+          32,
+        ),
         children: [
           _avatar(colors),
           const SizedBox(height: 12),
@@ -289,6 +410,16 @@ class _SettingsScreenAccountState extends State<SettingsScreenAccount> {
             autofillHints: const [AutofillHints.telephoneNumber],
             helperText: 'Include your country code',
             last: true,
+          ),
+          const SizedBox(height: 24),
+          OutlinedButton.icon(
+            onPressed: _loggingOut ? null : _logOut,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: colors.error,
+              minimumSize: const Size.fromHeight(52),
+            ),
+            icon: const Icon(Icons.logout_rounded),
+            label: const Text('Log out'),
           ),
         ],
       ),

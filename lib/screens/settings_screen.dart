@@ -1,107 +1,98 @@
 import 'package:flutter/material.dart';
+import '../navigation/main_section.dart';
+import '../services/auth_api.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_drawer.dart';
+import '../widgets/settings_row.dart';
 import 'settings_screen_account.dart';
 import 'settings_screen_notifications.dart';
 
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key});
+  const SettingsScreen({
+    super.key,
+    required this.onSectionSelected,
+    this.authApi,
+  });
 
-  Widget _sectionTitle(String title, ColorScheme colors) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-      child: Text(
-        title,
-        style: TextStyle(
-          color: colors.primary,
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-        ),
+  final AuthApi? authApi;
+
+  final ValueChanged<MainSection> onSectionSelected;
+
+  Widget _sectionTitle(String title, ColorScheme colors) => Padding(
+    padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+    child: Text(
+      title,
+      style: TextStyle(
+        color: colors.primary,
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
       ),
-    );
-  }
-
-  Widget _divider(ColorScheme colors, {double indent = 20}) {
-    return Divider(
-      height: 16,
-      thickness: 0.5,
-      indent: indent,
-      endIndent: 20,
-      color: colors.subtleDivider,
-    );
-  }
+    ),
+  );
 
   Widget _settingTile(
-    ColorScheme colors,
     IconData icon,
     String title,
     String subtitle,
     VoidCallback onTap,
-  ) {
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      horizontalTitleGap: 16,
-      leading: CircleAvatar(
-        backgroundColor: colors.primaryContainer,
-        child: Icon(icon, color: colors.onPrimaryContainer),
-      ),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
-      subtitle: Padding(
-        padding: const EdgeInsets.only(top: 4),
-        child: Text(
-          subtitle,
-          style: TextStyle(
-            fontSize: 13,
-            color: colors.secondaryText,
-            height: 1.4,
-          ),
-        ),
-      ),
-      onTap: onTap,
-    );
-  }
+  ) => SettingsRow(
+    icon: icon,
+    title: title,
+    subtitle: subtitle,
+    onTap: onTap,
+    height: 72,
+    horizontalPadding: 20,
+    card: false,
+  );
 
   @override
   Widget build(BuildContext context) {
     final colors = AppTheme.colorsOf(context);
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
+      drawer: AppDrawer(
+        selectedSection: MainSection.settings,
+        onSectionSelected: onSectionSelected,
+      ),
       body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.symmetric(vertical: 16),
         children: [
           _sectionTitle('Account', colors),
           _settingTile(
-            colors,
             Icons.person_outline,
             'Account',
             'Profile, phone number and personal details',
             () => Navigator.push(
               context,
               MaterialPageRoute<void>(
-                builder: (_) => const SettingsScreenAccount(),
+                builder: (_) => SettingsScreenAccount(authApi: authApi),
               ),
             ),
           ),
-          _divider(colors),
+          const SizedBox(height: 20),
           _sectionTitle('Security & Privacy', colors),
           _settingTile(
-            colors,
             Icons.security_outlined,
             'Security',
             'Password and account protection',
             () {},
           ),
-          _divider(colors, indent: 72),
+          Divider(
+            height: 1,
+            thickness: 1,
+            indent: 72,
+            endIndent: 20,
+            color: colors.subtleDivider,
+          ),
           _settingTile(
-            colors,
             Icons.lock_outline,
             'Privacy',
             'Control who can contact you',
             () {},
           ),
-          _divider(colors),
+          const SizedBox(height: 20),
           _sectionTitle('Notifications', colors),
           _settingTile(
-            colors,
             Icons.notifications_outlined,
             'Notifications',
             'Notification preferences and exceptions',

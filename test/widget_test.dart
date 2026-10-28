@@ -83,7 +83,22 @@ void main() {
     await pumpRegisteredApp(tester, authApi: api);
     await tester.tap(find.byTooltip('Open navigation menu'));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(ListTile, 'Log out'));
+    expect(find.text('Log out'), findsNothing);
+    await tester.tap(find.widgetWithText(ListTile, 'Settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Profile, phone number and personal details'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Log out'),
+      150,
+      scrollable: find
+          .descendant(
+            of: find.byType(ListView),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.tap(find.text('Log out'));
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(TextButton, 'Log out'));
     await tester.pumpAndSettle();

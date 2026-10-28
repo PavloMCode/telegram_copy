@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
+import '../navigation/main_section.dart';
 import '../theme/app_theme.dart';
 import 'chat_screen.dart';
-import 'settings_screen.dart';
-import 'contacts_screen.dart';
 import 'create_conversation_screen.dart';
-import 'registration_screen.dart';
 import '../services/auth_api.dart';
 
 abstract final class _HomeDrawerLayout {
@@ -24,11 +22,13 @@ class HomeScreen extends StatefulWidget {
     this.userName = 'My Name',
     this.phone = '+380 99 123 45 67',
     this.authApi,
+    required this.onSectionSelected,
   });
 
   final String userName;
   final String phone;
   final AuthApi? authApi;
+  final ValueChanged<MainSection> onSectionSelected;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -37,7 +37,6 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final _searchController = TextEditingController();
   bool _isSearching = false;
-  bool _loggingOut = false;
 
   // Demo data until conversations are loaded from the server.
   static const _chats = [
@@ -123,57 +122,6 @@ class _HomeScreenState extends State<HomeScreen> {
   void _open(Widget screen, {bool fromDrawer = false}) {
     if (fromDrawer) Navigator.pop(context);
     Navigator.push(context, MaterialPageRoute<void>(builder: (_) => screen));
-  }
-
-  Future<void> _logOut() async {
-    if (_loggingOut) return;
-    Navigator.pop(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Log out?'),
-        content: const Text(
-          'You can sign in again with your password and an email code. Local messages will be lost.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: Text(
-              'Log out',
-              style: TextStyle(color: AppTheme.colorsOf(dialogContext).error),
-            ),
-          ),
-        ],
-      ),
-    );
-    if (!mounted || confirmed != true) return;
-    setState(() => _loggingOut = true);
-    var revoked = true;
-    try {
-      await (widget.authApi ?? AuthApi.instance).logout();
-    } catch (_) {
-      revoked = false;
-    }
-    if (!mounted) return;
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute<void>(
-        builder: (_) => RegistrationScreen(authApi: widget.authApi),
-      ),
-      (_) => false,
-    );
-    if (!revoked) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Signed out on this device. The server session could not be revoked and will expire automatically.',
-          ),
-        ),
-      );
-    }
   }
 
   void _showCreatePanel(BuildContext context, {bool fromDrawer = false}) {
@@ -375,7 +323,10 @@ class _HomeScreenState extends State<HomeScreen> {
           colors,
           title: 'Contacts',
           icon: Icons.person_outline,
-          onTap: () => _open(const ContactsScreen(), fromDrawer: true),
+          onTap: () {
+            Navigator.pop(context);
+            widget.onSectionSelected(MainSection.contacts);
+          },
         ),
         _drawerItem(
           colors,
@@ -400,13 +351,10 @@ class _HomeScreenState extends State<HomeScreen> {
           colors,
           title: 'Settings',
           icon: Icons.settings_outlined,
-          onTap: () => _open(const SettingsScreen(), fromDrawer: true),
-        ),
-        _drawerItem(
-          colors,
-          title: 'Log out',
-          icon: Icons.logout_rounded,
-          onTap: _logOut,
+          onTap: () {
+            Navigator.pop(context);
+            widget.onSectionSelected(MainSection.settings);
+          },
         ),
       ],
     ),

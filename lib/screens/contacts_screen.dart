@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import '../navigation/main_section.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_drawer.dart';
 import 'contact_account_screen.dart';
 
 class ContactsScreen extends StatefulWidget {
-  const ContactsScreen({super.key});
+  const ContactsScreen({super.key, required this.onSectionSelected});
+
+  final ValueChanged<MainSection> onSectionSelected;
 
   @override
   State<ContactsScreen> createState() => _ContactsScreenState();
@@ -38,7 +42,6 @@ class _ContactsScreenState extends State<ContactsScreen> {
         .toList();
     return Scaffold(
       appBar: AppBar(
-        automaticallyImplyLeading: !_isSearching,
         titleSpacing: 8,
         title: _isSearching
             ? SizedBox(
@@ -101,6 +104,10 @@ class _ContactsScreenState extends State<ContactsScreen> {
               onPressed: () => setState(() => _isSearching = true),
             ),
         ],
+      ),
+      drawer: AppDrawer(
+        selectedSection: MainSection.contacts,
+        onSectionSelected: widget.onSectionSelected,
       ),
       body: Column(
         children: [

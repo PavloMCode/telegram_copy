@@ -1,11 +1,13 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../services/auth_api.dart';
+import '../services/local_auth_api.dart';
 import '../theme/app_theme.dart';
-import 'home_screen.dart';
+import 'main_screen.dart';
 
 enum _AuthStep { phone, profile, login, code }
 
@@ -109,7 +111,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         _confirmation.clear();
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute<void>(
-            builder: (_) => HomeScreen(
+            builder: (_) => MainScreen(
               userName: profile.name,
               phone: profile.phone,
               authApi: _auth,
@@ -142,6 +144,21 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       }
     } on AuthException catch (failure) {
       if (mounted) setState(() => _error = failure.message);
+    } on MissingPluginException {
+      if (mounted) {
+        setState(
+          () => _error =
+              'Local storage is not ready. Stop the app and run it again (not Hot Reload).',
+        );
+      }
+    } on PlatformException catch (failure) {
+      if (mounted) {
+        setState(
+          () => _error = failure.code == 'channel-error'
+              ? 'Local storage is not ready. Stop the app and run it again (not Hot Reload).'
+              : 'Local storage is unavailable. Please restart the app.',
+        );
+      }
     } catch (_) {
       if (mounted) {
         setState(() => _error = 'Authentication failed. Please try again.');
@@ -183,7 +200,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       prefixIcon: Icon(Icons.mail_outline),
     ),
     validator: (value) =>
-        RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(value?.trim() ?? '')
+        RegExp(
+          r'^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$',
+        ).hasMatch(value?.trim() ?? '')
         ? null
         : 'Enter a valid email address',
   );
@@ -391,7 +410,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                       _AuthStep.login =>
                         'Enter your email and password. We will then send you a verification code.',
                       _AuthStep.code =>
-                        'We sent a 6-digit code to ${_challenge!.email}. It expires in 5 minutes.',
+                        kDebugMode && _auth is LocalAuthApi
+                            ? 'Enter 123456 to confirm ${_challenge!.email} on this device.'
+                            : 'We sent a 6-digit code to ${_challenge!.email}. It expires in 5 minutes.',
                     },
                     textAlign: TextAlign.center,
                     style: TextStyle(
@@ -450,6 +471,17 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                       onPressed: _busy ? null : () => _go(_AuthStep.login),
                       child: const Text('Already have an account? Sign in'),
                     ),
+                  if (kDebugMode && _auth is LocalAuthApi) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      'Local test account · Verification code: 123456',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                   if (_step == _AuthStep.code)
                     TextButton(
                       onPressed: _busy || _resendSeconds > 0 ? null : _resend,
@@ -461,7 +493,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     ),
                   const SizedBox(height: 12),
                   Text(
-                    'Your phone number is not verified by SMS. Never share your password or email code.',
+                    kDebugMode && _auth is LocalAuthApi
+                        ? 'Use test data only. Your profile is saved on this device. No email is sent.'
+                        : 'Your phone number is not verified by SMS. Never share your password or email code.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 12,
