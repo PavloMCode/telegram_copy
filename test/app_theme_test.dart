@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:telegram_frontend/main.dart';
+import 'support/registered_app.dart';
 import 'package:telegram_frontend/screens/chat_screen.dart';
 import 'package:telegram_frontend/screens/home_screen.dart';
 import 'package:telegram_frontend/screens/settings_screen.dart';
@@ -15,7 +15,7 @@ void main() {
     ) async {
       tester.platformDispatcher.platformBrightnessTestValue = brightness;
       addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
-      await tester.pumpWidget(const TelegramApp());
+      await pumpRegisteredApp(tester);
       await tester.pumpAndSettle();
 
       final expected = brightness == Brightness.dark
@@ -74,7 +74,7 @@ void main() {
   ) async {
     tester.platformDispatcher.platformBrightnessTestValue = Brightness.light;
     addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
-    await tester.pumpWidget(const TelegramApp());
+    await pumpRegisteredApp(tester);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Anna'));
     await tester.pumpAndSettle();

@@ -3,6 +3,9 @@ import '../theme/app_theme.dart';
 import 'chat_screen.dart';
 import 'settings_screen.dart';
 import 'contacts_screen.dart';
+import 'create_conversation_screen.dart';
+import 'registration_screen.dart';
+import '../services/auth_api.dart';
 
 abstract final class _HomeDrawerLayout {
   static const width = 280.0;
@@ -16,7 +19,16 @@ abstract final class _HomeDrawerLayout {
 }
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({
+    super.key,
+    this.userName = 'My Name',
+    this.phone = '+380 99 123 45 67',
+    this.authApi,
+  });
+
+  final String userName;
+  final String phone;
+  final AuthApi? authApi;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -25,6 +37,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final _searchController = TextEditingController();
   bool _isSearching = false;
+  bool _loggingOut = false;
 
   // Demo data until conversations are loaded from the server.
   static const _chats = [
@@ -112,6 +125,57 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.push(context, MaterialPageRoute<void>(builder: (_) => screen));
   }
 
+  Future<void> _logOut() async {
+    if (_loggingOut) return;
+    Navigator.pop(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Log out?'),
+        content: const Text(
+          'You can sign in again with your password and an email code. Local messages will be lost.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(
+              'Log out',
+              style: TextStyle(color: AppTheme.colorsOf(dialogContext).error),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) return;
+    setState(() => _loggingOut = true);
+    var revoked = true;
+    try {
+      await (widget.authApi ?? AuthApi.instance).logout();
+    } catch (_) {
+      revoked = false;
+    }
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(
+        builder: (_) => RegistrationScreen(authApi: widget.authApi),
+      ),
+      (_) => false,
+    );
+    if (!revoked) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Signed out on this device. The server session could not be revoked and will expire automatically.',
+          ),
+        ),
+      );
+    }
+  }
+
   void _showCreatePanel(BuildContext context, {bool fromDrawer = false}) {
     if (fromDrawer) Navigator.pop(context);
     FocusScope.of(context).unfocus();
@@ -119,12 +183,18 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       showDragHandle: true,
       useSafeArea: true,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (sheetContext) {
         final colors = AppTheme.colorsOf(sheetContext);
-        Widget action(String title, String subtitle, IconData icon) {
+        Widget action(
+          String title,
+          String subtitle,
+          IconData icon,
+          Widget screen,
+        ) {
           return ListTile(
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 20,
@@ -143,9 +213,7 @@ class _HomeScreenState extends State<HomeScreen> {
             trailing: const Icon(Icons.chevron_right_rounded),
             onTap: () {
               Navigator.pop(sheetContext);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Creation is not available yet.')),
-              );
+              _open(screen);
             },
           );
         }
@@ -168,16 +236,19 @@ class _HomeScreenState extends State<HomeScreen> {
                   'New chat',
                   'Start a conversation',
                   Icons.chat_bubble_outline_rounded,
+                  const NewChatScreen(),
                 ),
                 action(
                   'New group',
                   'Bring people together',
                   Icons.group_outlined,
+                  const NewGroupScreen(),
                 ),
                 action(
                   'New channel',
                   'Share updates with subscribers',
                   Icons.campaign_outlined,
+                  const NewChannelScreen(),
                 ),
               ],
             ),
@@ -263,7 +334,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'My Name',
+                      widget.userName,
                       textAlign: TextAlign.center,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -276,7 +347,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '+380 99 123 45 67',
+                      widget.phone,
                       textAlign: TextAlign.center,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -330,6 +401,12 @@ class _HomeScreenState extends State<HomeScreen> {
           title: 'Settings',
           icon: Icons.settings_outlined,
           onTap: () => _open(const SettingsScreen(), fromDrawer: true),
+        ),
+        _drawerItem(
+          colors,
+          title: 'Log out',
+          icon: Icons.logout_rounded,
+          onTap: _logOut,
         ),
       ],
     ),
