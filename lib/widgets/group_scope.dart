@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/local_group_store.dart';
 import 'profile_scope.dart';
+import 'contact_scope.dart';
+import 'account_data_scope.dart';
 
 class GroupScope extends InheritedWidget {
   const GroupScope({super.key, required this.store, required super.child});
@@ -13,7 +15,13 @@ class GroupScope extends InheritedWidget {
       profile: ProfileScope.of(context),
       child: child,
     );
-    return store == null ? content : GroupScope(store: store, child: content);
+    return AccountDataScope.wrap(
+      context,
+      ContactScope.wrap(
+        context,
+        store == null ? content : GroupScope(store: store, child: content),
+      ),
+    );
   }
 
   @override

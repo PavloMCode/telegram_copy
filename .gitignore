@@ -33,6 +33,17 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Device databases and manually exported local app data
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.db-shm
+*.db-wal
+/local_storage/
+/local_groups/
+/local_media/
+
 # Symbolication related
 app.*.symbols
 

@@ -7,6 +7,11 @@ import '../widgets/search_app_bar.dart';
 import 'contact_account_screen.dart';
 import '../widgets/group_scope.dart';
 import '../widgets/contact_call_dialog.dart';
+import '../widgets/contact_scope.dart';
+import '../widgets/account_data_scope.dart';
+import '../widgets/local_contact_editor.dart';
+import '../widgets/contact_actions.dart';
+import '../widgets/confirmation_dialog.dart';
 
 class ContactsScreen extends StatefulWidget {
   const ContactsScreen({super.key, required this.onSectionSelected});
@@ -29,14 +34,16 @@ class _ContactsScreenState extends State<ContactsScreen> {
   @override
   Widget build(BuildContext context) {
     final colors = AppTheme.colorsOf(context);
+    final contactStore = ContactScope.maybeOf(context);
     final query = _searchController.text.trim().toLowerCase();
-    final contacts = DemoContacts.all
-        .where(
-          (contact) =>
-              contact.name.toLowerCase().contains(query) ||
-              contact.phone.contains(query),
-        )
-        .toList();
+    final contacts =
+        (AccountDataScope.maybeOf(context)?.contacts ?? DemoContacts.all)
+            .where(
+              (contact) =>
+                  contact.name.toLowerCase().contains(query) ||
+                  contact.phone.contains(query),
+            )
+            .toList();
     return Scaffold(
       appBar: SearchAppBar(
         title: 'Contacts',
@@ -100,22 +107,25 @@ class _ContactsScreenState extends State<ContactsScreen> {
                         ),
                         trailing: IconButton(
                           tooltip: 'Call ${contact.name}',
-                          onPressed: () =>
-                              showContactCallDialog(context, contact.name),
+                          onPressed: contactStore?.isBlocked(contact.id) == true
+                              ? null
+                              : () => showContactCallDialog(
+                                  context,
+                                  contact.name,
+                                ),
                           icon: Icon(
                             Icons.phone_outlined,
                             color: colors.primary,
                           ),
                         ),
                         onTap: () {
+                          final screen = GroupScope.wrap(
+                            context,
+                            ContactAccountScreen(contact: contact),
+                          );
                           Navigator.push(
                             context,
-                            MaterialPageRoute(
-                              builder: (_) => GroupScope.wrap(
-                                context,
-                                ContactAccountScreen(contact: contact),
-                              ),
-                            ),
+                            MaterialPageRoute(builder: (_) => screen),
                           );
                         },
                       );
@@ -153,19 +163,28 @@ class _ContactsScreenState extends State<ContactsScreen> {
                   'Add contact',
                   Icons.person_add_outlined,
                   colors.primary,
-                  () {},
+                  () {
+                    Navigator.pop(sheetContext);
+                    _editContact();
+                  },
                 ),
                 _contactAction(
                   'Remove contact',
                   Icons.person_remove_outlined,
                   colors.onSurfaceVariant,
-                  () {},
+                  () {
+                    Navigator.pop(sheetContext);
+                    _selectContactAction(remove: true);
+                  },
                 ),
                 _contactAction(
                   'Block contact',
                   Icons.person_off_outlined,
                   colors.error,
-                  () {},
+                  () {
+                    Navigator.pop(sheetContext);
+                    _selectContactAction(remove: false);
+                  },
                 ),
               ],
             ),
@@ -173,6 +192,75 @@ class _ContactsScreenState extends State<ContactsScreen> {
         );
       },
     );
+  }
+
+  Future<void> _editContact() async {
+    final store = AccountDataScope.maybeOf(context);
+    if (store == null) return;
+    final contact = await showLocalContactEditor(context);
+    if (!mounted || contact == null) return;
+    try {
+      await store.saveContact(contact);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not save contact.')),
+        );
+      }
+    }
+  }
+
+  Future<void> _selectContactAction({required bool remove}) async {
+    final data = AccountDataScope.maybeOf(context);
+    final contactStore = ContactScope.maybeOf(context);
+    if (data == null) return;
+    final contact = await showModalBottomSheet<DemoContact>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            for (final contact in data.contacts)
+              ListTile(
+                title: Text(contact.name),
+                subtitle: Text(contact.phone),
+                onTap: () => Navigator.pop(sheetContext, contact),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || contact == null) return;
+    if (!remove) {
+      if (contactStore != null) {
+        await performContactAction(
+          context,
+          contactStore,
+          contact.id,
+          contactStore.isBlocked(contact.id)
+              ? ContactAction.unblock
+              : ContactAction.block,
+        );
+      }
+      return;
+    }
+    final confirmed = await showConfirmationDialog(
+      context,
+      title: 'Remove contact?',
+      message: 'Remove ${contact.name} from your local contacts?',
+      confirmLabel: 'Remove',
+    );
+    if (!mounted || !confirmed) return;
+    try {
+      await data.removeContact(contact.id);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not remove contact.')),
+        );
+      }
+    }
   }
 
   Widget _contactAction(

@@ -46,6 +46,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(copied, DemoContacts.maksym.phone);
       await tester.ensureVisible(find.text('Message'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Message'));
       await tester.pumpAndSettle();
       expect(

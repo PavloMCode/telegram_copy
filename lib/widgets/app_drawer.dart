@@ -3,6 +3,7 @@ import '../navigation/main_section.dart';
 import '../screens/chat_screen.dart';
 import '../theme/app_theme.dart';
 import 'drawer_profile_header.dart';
+import 'group_scope.dart';
 
 abstract final class _DrawerLayout {
   static const width = 280.0;
@@ -33,8 +34,10 @@ class AppDrawer extends StatelessWidget {
     Scaffold.of(context).closeDrawer();
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) =>
-            const ChatScreen(chatId: 'saved', chatName: 'Saved Messages'),
+        builder: (_) => GroupScope.wrap(
+          context,
+          const ChatScreen(chatId: 'saved', chatName: 'Saved Messages'),
+        ),
       ),
     );
   }

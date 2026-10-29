@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../data/demo_data.dart';
 import '../models/local_group.dart';
 import 'auth_api.dart';
+import 'local_database.dart';
 
 class GroupException implements Exception {
   const GroupException(this.message);
@@ -14,7 +15,9 @@ class GroupException implements Exception {
 
 /// Frontend-only groups, isolated by the locally signed-in profile.
 class LocalGroupStore extends ChangeNotifier {
-  LocalGroupStore(this.profile);
+  LocalGroupStore(this.profile, {this.database, this.contactList});
+  final LocalDatabase? database;
+  final List<DemoContact> Function()? contactList;
   final AuthProfile profile;
   String get userId => profile.phone;
   String get storageKey => 'local_groups_v1_$userId';
@@ -31,11 +34,27 @@ class LocalGroupStore extends ChangeNotifier {
     try {
       final preferences = await SharedPreferences.getInstance();
       final raw = preferences.getString(storageKey);
-      if (raw != null) {
+      if (database != null &&
+          await database!.get(userId, 'migration', 'groups') != null) {
+        final metadata = await database!.all(userId, 'groups');
+        for (final entry in metadata.entries) {
+          _groups[entry.key] = LocalGroup.fromJson({
+            ...entry.value,
+            'messages': await database!.messages(userId, entry.key),
+          });
+        }
+      } else if (raw != null) {
         final entries = (jsonDecode(raw) as List).map(
           (item) => LocalGroup.fromJson(Map<String, dynamic>.from(item as Map)),
         );
         _groups = {for (final group in entries) group.id: group};
+      }
+      if (database != null &&
+          await database!.get(userId, 'migration', 'groups') == null) {
+        await database!.saveGroups(
+          userId,
+          _groups.values.map((g) => g.toJson()).toList(),
+        );
       }
       loadError = null;
     } catch (_) {
@@ -54,14 +73,21 @@ class LocalGroupStore extends ChangeNotifier {
           entry.key: LocalGroup.fromJson(entry.value.toJson()),
       };
       change(next);
-      final preferences = await SharedPreferences.getInstance();
-      if (!await preferences.setString(
-        storageKey,
-        jsonEncode(next.values.map((g) => g.toJson()).toList()),
-      )) {
-        throw const GroupException(
-          'Could not save the group. Please try again.',
+      if (database != null) {
+        await database!.saveGroups(
+          userId,
+          next.values.map((g) => g.toJson()).toList(),
         );
+      } else {
+        final preferences = await SharedPreferences.getInstance();
+        if (!await preferences.setString(
+          storageKey,
+          jsonEncode(next.values.map((g) => g.toJson()).toList()),
+        )) {
+          throw const GroupException(
+            'Could not save the group. Please try again.',
+          );
+        }
       }
       _groups = next;
       if (!_disposed) notifyListeners();
@@ -98,7 +124,7 @@ class LocalGroupStore extends ChangeNotifier {
         description.length > 255) {
       throw const GroupException('Enter a valid group name and description.');
     }
-    final selected = DemoContacts.all
+    final selected = (contactList?.call() ?? DemoContacts.all)
         .where((c) => memberIds.contains(c.id))
         .toList();
     if (selected.isEmpty) {
@@ -114,6 +140,32 @@ class LocalGroupStore extends ChangeNotifier {
         members: [
           GroupMember(id: userId, name: profile.name, role: GroupRole.owner),
           ...selected.map((c) => GroupMember(id: c.id, name: c.name)),
+        ],
+      ),
+    );
+    return id;
+  }
+
+  Future<String> createChannel({
+    required String name,
+    String description = '',
+    Uint8List? photo,
+    String? publicLink,
+  }) async {
+    if (name.trim().isEmpty) {
+      throw const GroupException('Enter a channel name.');
+    }
+    final id = 'local-channel-${DateTime.now().microsecondsSinceEpoch}';
+    await _commit(
+      (groups) => groups[id] = LocalGroup(
+        id: id,
+        name: name.trim(),
+        description: description.trim(),
+        photo: photo,
+        isChannel: true,
+        publicLink: publicLink,
+        members: [
+          GroupMember(id: userId, name: profile.name, role: GroupRole.owner),
         ],
       ),
     );
@@ -140,7 +192,7 @@ class LocalGroupStore extends ChangeNotifier {
   Future<void> addMembers(String id, List<String> memberIds) =>
       _commit((groups) {
         final group = _require(groups, id, manage: true);
-        for (final contact in DemoContacts.all.where(
+        for (final contact in (contactList?.call() ?? DemoContacts.all).where(
           (c) => memberIds.contains(c.id),
         )) {
           if (group.roleOf(contact.id) == null) {

@@ -90,7 +90,12 @@ void main() {
     await tester.tap(find.byTooltip('Create channel'));
     await tester.pumpAndSettle();
     expect(
-      tester.widget<ChatScreen>(find.byType(ChatScreen)).chatName,
+      tester
+          .widget<GroupChatScreen>(find.byType(GroupChatScreen))
+          .store
+          .groups
+          .single
+          .name,
       'Public news',
     );
     expect(tester.takeException(), isNull);
@@ -107,7 +112,12 @@ void main() {
     await tester.tap(find.byTooltip('Create channel'));
     await tester.pumpAndSettle();
     expect(
-      tester.widget<ChatScreen>(find.byType(ChatScreen)).chatName,
+      tester
+          .widget<GroupChatScreen>(find.byType(GroupChatScreen))
+          .store
+          .groups
+          .single
+          .name,
       'Study news',
     );
     expect(tester.takeException(), isNull);

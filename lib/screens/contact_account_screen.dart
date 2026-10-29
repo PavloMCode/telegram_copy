@@ -6,10 +6,13 @@ import '../services/local_group_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/contact_call_dialog.dart';
 import '../widgets/group_scope.dart';
+import '../widgets/contact_scope.dart';
+import '../widgets/contact_actions.dart';
+import '../services/local_contact_store.dart';
 import 'chat_screen.dart';
 import 'group_chat_screen.dart';
 
-class ContactAccountScreen extends StatelessWidget {
+class ContactAccountScreen extends StatefulWidget {
   const ContactAccountScreen({
     super.key,
     required this.contact,
@@ -17,6 +20,53 @@ class ContactAccountScreen extends StatelessWidget {
   });
   final DemoContact contact;
   final bool fromChat;
+
+  @override
+  State<ContactAccountScreen> createState() => _ContactAccountScreenState();
+}
+
+class _ContactAccountScreenState extends State<ContactAccountScreen> {
+  DemoContact get contact => widget.contact;
+  bool get fromChat => widget.fromChat;
+  LocalContactStore? _contacts;
+  bool _ownsContacts = false;
+  bool _busy = false;
+  bool get _blocked => _contacts?.isBlocked(contact.id) ?? false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final inherited = ContactScope.maybeOf(context);
+    final store = inherited ?? _contacts ?? LocalContactStore();
+    if (!identical(store, _contacts)) {
+      _contacts?.removeListener(_onContactChanged);
+      if (_ownsContacts) _contacts?.dispose();
+      _contacts = store;
+      _ownsContacts = inherited == null;
+      store.addListener(_onContactChanged);
+    }
+  }
+
+  void _onContactChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _contacts?.removeListener(_onContactChanged);
+    if (_ownsContacts) _contacts?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _action(ContactAction action) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await performContactAction(context, _contacts!, contact.id, action);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   Future<void> _copy(BuildContext context, String value, String message) async {
     await Clipboard.setData(ClipboardData(text: value));
@@ -39,14 +89,19 @@ class ContactAccountScreen extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final store = GroupScope.maybeOf(context);
-    if (store == null) return _page(context, null);
-    return ListenableBuilder(
-      listenable: store,
-      builder: (context, _) => _page(context, store),
-    );
-  }
+  Widget build(BuildContext context) => ContactScope(
+    store: _contacts!,
+    child: Builder(
+      builder: (context) {
+        final store = GroupScope.maybeOf(context);
+        if (store == null) return _page(context, null);
+        return ListenableBuilder(
+          listenable: store,
+          builder: (context, _) => _page(context, store),
+        );
+      },
+    ),
+  );
 
   Widget _page(BuildContext context, LocalGroupStore? store) {
     final colors = AppTheme.colorsOf(context);
@@ -68,22 +123,37 @@ class ContactAccountScreen extends StatelessWidget {
         actions: [
           PopupMenuButton<String>(
             tooltip: 'Contact options',
-            onSelected: (action) => action == 'copy-phone'
-                ? _copy(context, contact.phone, 'Phone number copied')
-                : _copy(
-                    context,
-                    '${contact.name}\n${contact.phone}',
-                    'Contact details copied',
-                  ),
-            itemBuilder: (_) => const [
-              PopupMenuItem(
+            enabled: !_busy,
+            onSelected: (action) {
+              if (action == 'copy-phone') {
+                _copy(context, contact.phone, 'Phone number copied');
+              } else if (action == 'copy-contact') {
+                _copy(
+                  context,
+                  '${contact.name}\n${contact.phone}',
+                  'Contact details copied',
+                );
+              } else {
+                _action(
+                  action == 'clear'
+                      ? ContactAction.clearHistory
+                      : _blocked
+                      ? ContactAction.unblock
+                      : ContactAction.block,
+                );
+              }
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(
                 value: 'copy-phone',
                 child: Text('Copy phone number'),
               ),
-              PopupMenuItem(
+              const PopupMenuItem(
                 value: 'copy-contact',
                 child: Text('Copy contact details'),
               ),
+              const PopupMenuDivider(),
+              ...contactActionMenuItems(context, blocked: _blocked),
             ],
           ),
         ],
@@ -132,7 +202,7 @@ class ContactAccountScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      contact.status,
+                      _blocked ? 'Blocked' : contact.status,
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 13,
@@ -240,6 +310,36 @@ class ContactAccountScreen extends StatelessWidget {
                   ),
                 ),
               ),
+            const SizedBox(height: 28),
+            _section(context, 'Contact actions'),
+            const SizedBox(height: 8),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.delete_outline, color: colors.error),
+              title: Text(
+                'Clear history',
+                style: TextStyle(color: colors.error),
+              ),
+              onTap: _busy ? null : () => _action(ContactAction.clearHistory),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(
+                _blocked ? Icons.lock_open : Icons.block,
+                color: _blocked ? colors.primary : colors.error,
+              ),
+              title: Text(
+                _blocked ? 'Unblock user' : 'Block user',
+                style: TextStyle(
+                  color: _blocked ? colors.primary : colors.error,
+                ),
+              ),
+              onTap: _busy
+                  ? null
+                  : () => _action(
+                      _blocked ? ContactAction.unblock : ContactAction.block,
+                    ),
+            ),
           ],
         ),
       ),
@@ -251,7 +351,9 @@ class ContactAccountScreen extends StatelessWidget {
       minimumSize: const Size(0, 48),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
     ),
-    onPressed: () => showContactCallDialog(context, contact.name),
+    onPressed: _blocked || _busy
+        ? null
+        : () => showContactCallDialog(context, contact.name),
     icon: const Icon(Icons.call_outlined, size: 20),
     label: const Text('Call', textAlign: TextAlign.center),
   );

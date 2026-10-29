@@ -8,6 +8,7 @@ import '../services/profile_photo_picker.dart';
 import 'chat_screen.dart';
 import 'group_chat_screen.dart';
 import '../widgets/group_scope.dart';
+import '../widgets/account_data_scope.dart';
 import '../services/local_group_store.dart';
 
 void _openConversation(BuildContext context, String id, String name) {
@@ -15,8 +16,9 @@ void _openConversation(BuildContext context, String id, String name) {
   final screen = store?.find(id) == null
       ? ChatScreen(chatId: id, chatName: name)
       : GroupChatScreen(store: store!, groupId: id);
+  final wrapped = GroupScope.wrap(context, screen);
   Navigator.of(context).pushAndRemoveUntil(
-    MaterialPageRoute<void>(builder: (_) => screen),
+    MaterialPageRoute<void>(builder: (_) => wrapped),
     (route) => route.isFirst,
   );
 }
@@ -58,7 +60,9 @@ class _ContactPickerState extends State<_ContactPicker> {
   Widget build(BuildContext context) {
     final colors = AppTheme.colorsOf(context);
     final query = _search.text.trim().toLowerCase();
-    final contacts = DemoContacts.all
+    final allContacts =
+        AccountDataScope.maybeOf(context)?.contacts ?? DemoContacts.all;
+    final contacts = allContacts
         .where((contact) => contact.name.toLowerCase().contains(query))
         .toList();
     return Scaffold(
@@ -107,7 +111,9 @@ class _ContactPickerState extends State<_ContactPicker> {
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   children: [
-                    for (final contact in DemoContacts.all)
+                    for (final contact
+                        in (AccountDataScope.maybeOf(context)?.contacts ??
+                            DemoContacts.all))
                       if (_selected.contains(contact.id))
                         Padding(
                           padding: const EdgeInsets.only(right: 8),
@@ -148,7 +154,10 @@ class _ContactPickerState extends State<_ContactPicker> {
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute<void>(
-                          builder: (_) => const NewChannelScreen(),
+                          builder: (_) => GroupScope.wrap(
+                            context,
+                            const NewChannelScreen(),
+                          ),
                         ),
                       ),
                     ),
@@ -299,7 +308,14 @@ class _ConversationDetailsState extends State<_ConversationDetails> {
       Navigator.push(
         context,
         MaterialPageRoute<void>(
-          builder: (_) => _ChannelTypeScreen(name: _name.text.trim()),
+          builder: (_) => GroupScope.wrap(
+            context,
+            _ChannelTypeScreen(
+              name: _name.text.trim(),
+              description: _description.text.trim(),
+              photo: _photo,
+            ),
+          ),
         ),
       );
     } else {
@@ -441,7 +457,13 @@ class _ConversationDetailsState extends State<_ConversationDetails> {
 enum _ChannelType { public, private }
 
 class _ChannelTypeScreen extends StatefulWidget {
-  const _ChannelTypeScreen({required this.name});
+  const _ChannelTypeScreen({
+    required this.name,
+    this.description = '',
+    this.photo,
+  });
+  final String description;
+  final Uint8List? photo;
 
   final String name;
 
@@ -454,6 +476,7 @@ class _ChannelTypeScreenState extends State<_ChannelTypeScreen> {
       'local-channel-${DateTime.now().microsecondsSinceEpoch}';
   late final String _publicLink = 'https://example.invalid/channel/$_channelId';
   _ChannelType _type = _ChannelType.public;
+  bool _saving = false;
 
   @override
   Widget build(BuildContext context) {
@@ -519,7 +542,39 @@ class _ChannelTypeScreenState extends State<_ChannelTypeScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         tooltip: 'Create channel',
-        onPressed: () => _openConversation(context, _channelId, widget.name),
+        onPressed: _saving
+            ? null
+            : () async {
+                final store = GroupScope.maybeOf(context);
+                if (store == null) {
+                  _openConversation(context, _channelId, widget.name);
+                  return;
+                }
+                setState(() => _saving = true);
+                try {
+                  final id = await store.createChannel(
+                    name: widget.name,
+                    description: widget.description,
+                    photo: widget.photo,
+                    publicLink: _type == _ChannelType.public
+                        ? _publicLink
+                        : null,
+                  );
+                  if (context.mounted) {
+                    _openConversation(context, id, widget.name);
+                  }
+                } catch (_) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Could not save the channel.'),
+                      ),
+                    );
+                  }
+                } finally {
+                  if (mounted) setState(() => _saving = false);
+                }
+              },
         child: const Icon(Icons.check),
       ),
     );

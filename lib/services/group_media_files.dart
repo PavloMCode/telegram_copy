@@ -6,7 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import '../models/local_group.dart';
 
 Future<Directory> _groupDirectory(String userId, String groupId) async {
-  if (!RegExp(r'^local-group-[0-9]+$').hasMatch(groupId)) {
+  if (!RegExp(r'^[a-zA-Z0-9_-]{1,100}$').hasMatch(groupId)) {
     throw const FormatException('Invalid group ID');
   }
   final root = await getApplicationDocumentsDirectory();

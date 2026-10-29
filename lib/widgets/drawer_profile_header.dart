@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 import 'profile_scope.dart';
+import 'account_data_scope.dart';
 
 /// Shared, adaptive profile header for every main section.
 class DrawerProfileHeader extends StatelessWidget {
@@ -11,6 +12,7 @@ class DrawerProfileHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = AppTheme.colorsOf(context);
     final profile = ProfileScope.of(context);
+    final photo = AccountDataScope.maybeOf(context)?.photo;
     final dark = colors.brightness == Brightness.dark;
     final initials = profile.name
         .trim()
@@ -52,9 +54,21 @@ class DrawerProfileHeader extends StatelessWidget {
                       minimumSize: const Size(44, 44),
                       shape: const CircleBorder(),
                     ),
-                    onPressed: () => AppTheme.selectedMode.value = dark
-                        ? ThemeMode.light
-                        : ThemeMode.dark,
+                    onPressed: () async {
+                      try {
+                        await AppTheme.setMode(
+                          dark ? ThemeMode.light : ThemeMode.dark,
+                        );
+                      } catch (_) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Could not save the theme.'),
+                            ),
+                          );
+                        }
+                      }
+                    },
                     icon: AnimatedSwitcher(
                       duration: const Duration(milliseconds: 180),
                       child: Icon(
@@ -80,9 +94,14 @@ class DrawerProfileHeader extends StatelessWidget {
                         ),
                       ),
                       child: CircleAvatar(
+                        backgroundImage: photo == null
+                            ? null
+                            : MemoryImage(photo),
                         radius: 38,
                         backgroundColor: colors.primaryContainer,
-                        child: initials.isEmpty
+                        child: photo != null
+                            ? null
+                            : initials.isEmpty
                             ? Icon(
                                 Icons.person_outline_rounded,
                                 size: 32,

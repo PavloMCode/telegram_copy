@@ -1,9 +1,18 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import '../services/local_account_store.dart';
+import '../services/stored_platform_file.dart';
+import '../services/group_media_files.dart';
+import '../models/local_group.dart';
+import '../widgets/account_data_scope.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import '../theme/app_theme.dart';
 import '../data/demo_data.dart';
-import '../widgets/confirmation_dialog.dart';
+import '../widgets/contact_actions.dart';
+import '../widgets/contact_scope.dart';
+import '../services/local_contact_store.dart';
+import '../widgets/contact_call_dialog.dart';
 import '../widgets/chat/chat_layout.dart';
 import '../widgets/chat/chat_composer.dart';
 import '../widgets/chat/attachment_menu.dart';
@@ -35,13 +44,20 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
   final List<_Message> _messages = [];
   final List<_Attachment> _pendingFiles = [];
   bool _pickingFiles = false;
-  bool _blocked = false;
+  LocalAccountStore? _data;
+  bool _restoring = false;
+  Timer? _draftTimer;
+  LocalContactStore? _contacts;
+  bool _ownsContacts = false;
+  int _clearVersion = 0;
+  bool _contactActionBusy = false;
+  bool get _blocked => _contacts?.isBlocked(widget.chatId) ?? false;
   bool _showEmoji = false;
   String? _replyPreview;
   String? _forwardedFrom;
@@ -50,11 +66,137 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _messageController.addListener(_scheduleDraft);
     final draft = widget._forwardDraft;
     if (draft != null) {
       _pendingForward = draft;
       _forwardedFrom = draft.forwardedFrom;
     }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final data = AccountDataScope.maybeOf(context);
+    if (data?.database != null && !identical(data, _data)) {
+      _data = data;
+      _restoring = true;
+      _restore(data!);
+    }
+    final inherited = ContactScope.maybeOf(context);
+    final store = inherited ?? _contacts ?? LocalContactStore();
+    if (!identical(store, _contacts)) {
+      _contacts?.removeListener(_onContactChanged);
+      if (_ownsContacts) _contacts?.dispose();
+      _contacts = store;
+      _ownsContacts = inherited == null;
+      _clearVersion = store.clearVersion(widget.chatId);
+      store.addListener(_onContactChanged);
+    }
+  }
+
+  void _onContactChanged() {
+    if (!mounted) return;
+    setState(() {
+      final version = _contacts!.clearVersion(widget.chatId);
+      if (version != _clearVersion) {
+        _clearVersion = version;
+        _messages.clear();
+        _replyPreview = null;
+        _forwardedFrom = null;
+        _pendingForward = null;
+      }
+      if (_blocked) _showEmoji = false;
+    });
+  }
+
+  Future<void> _contactAction(ContactAction action) async {
+    if (_contactActionBusy) return;
+    setState(() => _contactActionBusy = true);
+    try {
+      await performContactAction(context, _contacts!, widget.chatId, action);
+    } finally {
+      if (mounted) setState(() => _contactActionBusy = false);
+    }
+  }
+
+  Future<void> _restore(LocalAccountStore data) async {
+    try {
+      final messages = await data.messages(widget.chatId);
+      final draft = await data.draft(widget.chatId);
+      if (!mounted) return;
+      setState(() {
+        _messages
+          ..clear()
+          ..addAll(messages.map(_Message.fromJson));
+        if (draft != null && _messageController.text.isEmpty) {
+          _messageController.text = draft['text'] as String? ?? '';
+          _replyPreview = draft['reply'] as String?;
+          if (_pendingForward == null && draft['forward'] != null) {
+            _pendingForward = _Message.fromJson(
+              Map<String, dynamic>.from(draft['forward'] as Map),
+            );
+          }
+          _forwardedFrom = _pendingForward?.forwardedFrom;
+          _pendingFiles.addAll(
+            (draft['files'] as List? ?? []).map(
+              (f) => _Attachment.fromJson(Map<String, dynamic>.from(f as Map)),
+            ),
+          );
+        }
+        _restoring = false;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() => _restoring = false);
+        _storageError();
+      }
+    }
+  }
+
+  void _storageError() {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not save local chat data. Please try again.'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _persist() async {
+    if (_data == null || _restoring) return;
+    try {
+      await _data!.saveConversation(
+        widget.chatId,
+        widget.chatName,
+        _messages.map((m) => m.toJson()).toList(),
+      );
+      await _saveDraft();
+    } catch (_) {
+      _storageError();
+    }
+  }
+
+  void _scheduleDraft() {
+    if (_data == null || _restoring) return;
+    _draftTimer?.cancel();
+    _draftTimer = Timer(
+      const Duration(milliseconds: 300),
+      () => unawaited(_saveDraft().catchError((Object _) => _storageError())),
+    );
+  }
+
+  Future<void> _saveDraft() async {
+    if (_data == null || _restoring) return;
+    final draft = {
+      'text': _messageController.text,
+      'reply': _replyPreview,
+      'files': _pendingFiles.map((f) => f.toJson()).toList(),
+      'forward': _pendingForward?.toJson(),
+    };
+    await _data!.saveDraft(widget.chatId, draft);
   }
 
   String _preview(_Message message) => message.text.isNotEmpty
@@ -63,15 +205,30 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _contacts?.removeListener(_onContactChanged);
+    if (_ownsContacts) _contacts?.dispose();
+    _draftTimer?.cancel();
+    unawaited(_saveDraft().catchError((Object _) {}));
+    _messageController.removeListener(_scheduleDraft);
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) {
+      _draftTimer?.cancel();
+      unawaited(_saveDraft().catchError((Object _) => _storageError()));
+    }
   }
 
   void _sendMessage() {
     final text = _messageController.text.trim();
     if ((text.isEmpty && _pendingFiles.isEmpty && _pendingForward == null) ||
         _blocked ||
+        _restoring ||
         _pickingFiles) {
       return;
     }
@@ -105,6 +262,7 @@ class _ChatScreenState extends State<ChatScreen> {
       _forwardedFrom = null;
       _pendingForward = null;
     });
+    unawaited(_persist());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && _scrollController.hasClients) {
         _scrollController.animateTo(
@@ -135,12 +293,22 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       final files = await FilePicker.pickFiles(type: type);
       final attachments = <_Attachment>[];
-      for (final file in files) {
+      for (var file in files) {
+        if (_data != null) {
+          final saved = await saveGroupMedia(
+            _data!.accountId,
+            widget.chatId,
+            file,
+            GroupMediaKind.file,
+          );
+          file = StoredPlatformFile(saved.name, saved.path, saved.size);
+        }
         final size = file.lengthSync() ?? await file.length();
         attachments.add(_Attachment(file, size));
       }
       if (!mounted || _blocked) return;
       setState(() => _pendingFiles.addAll(attachments));
+      _scheduleDraft();
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -157,6 +325,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void _toggleReaction(_Message message, String emoji) {
     if (!_messages.contains(message)) return;
     setState(() => message.reaction = message.reaction == emoji ? null : emoji);
+    unawaited(_persist());
   }
 
   Future<void> _showMessageActions(
@@ -190,11 +359,13 @@ class _ChatScreenState extends State<ChatScreen> {
       await _editMessage(context, message);
     } else if (action == 'reply') {
       setState(() => _replyPreview = _preview(message));
+      _scheduleDraft();
     } else if (action == 'forward') {
       if (!context.mounted) return;
       await _forwardMessage(context, message);
     } else if (action == 'delete') {
       setState(() => _messages.remove(message));
+      unawaited(_persist());
     } else {
       _toggleReaction(message, action);
     }
@@ -245,6 +416,7 @@ class _ChatScreenState extends State<ChatScreen> {
       message.text = result;
       message.edited = true;
     });
+    unawaited(_persist());
   }
 
   Future<void> _forwardMessage(BuildContext context, _Message message) async {
@@ -283,15 +455,22 @@ class _ChatScreenState extends State<ChatScreen> {
     if (!mounted || !context.mounted || target == null) return;
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => ChatScreen._forward(
-          chatId: target,
-          chatName: chats[target]!,
-          message: _Message(
-            message.text,
-            DateTime.now(),
-            files: List.of(message.files),
-            forwardedFrom: message.forwardedFrom ?? widget.chatName,
+        builder: (_) => ContactScope.wrap(
+          context,
+          GroupScope.wrap(
+            context,
+            ChatScreen._forward(
+              chatId: target,
+              chatName: chats[target]!,
+              message: _Message(
+                message.text,
+                DateTime.now(),
+                files: List.of(message.files),
+                forwardedFrom: message.forwardedFrom ?? widget.chatName,
+              ),
+            ),
           ),
+          fallback: _contacts,
         ),
       ),
     );
@@ -338,37 +517,14 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Future<void> _confirmAction(
-    BuildContext context, {
-    required bool block,
-  }) async {
-    final confirmed = await showConfirmationDialog(
-      context,
-      title: block ? 'Block user?' : 'Clear history?',
-      message: block
-          ? 'Sending messages will be disabled for this session. You can unblock the user at any time.'
-          : 'All messages in this local session will be removed.',
-      confirmLabel: block ? 'Block' : 'Clear',
-    );
-    if (!mounted || confirmed != true) return;
-    setState(() {
-      if (block) {
-        _blocked = true;
-        _showEmoji = false;
-        FocusScope.of(context).unfocus();
-      } else {
-        _messages.clear();
-      }
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final colors = AppTheme.colorsOf(context);
     final saved = widget.chatId == 'saved';
-    final contact = DemoContacts.all
-        .where((contact) => contact.id == widget.chatId)
-        .firstOrNull;
+    final contact =
+        (AccountDataScope.maybeOf(context)?.contacts ?? DemoContacts.all)
+            .where((contact) => contact.id == widget.chatId)
+            .firstOrNull;
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
@@ -381,9 +537,13 @@ class _ChatScreenState extends State<ChatScreen> {
               ? null
               : () {
                   FocusScope.of(context).unfocus();
-                  final screen = GroupScope.wrap(
+                  final screen = ContactScope.wrap(
                     context,
-                    ContactAccountScreen(contact: contact, fromChat: true),
+                    GroupScope.wrap(
+                      context,
+                      ContactAccountScreen(contact: contact, fromChat: true),
+                    ),
+                    fallback: _contacts,
                   );
                   Navigator.push<void>(
                     context,
@@ -392,55 +552,36 @@ class _ChatScreenState extends State<ChatScreen> {
                 },
           name: widget.chatName,
           status: _blocked
-              ? 'Blocked in this session'
+              ? 'Contact blocked'
               : saved
               ? 'Your personal space'
               : 'Local chat · offline',
           icon: saved ? Icons.bookmark_border : null,
         ),
         actions: [
+          if (contact != null)
+            IconButton(
+              tooltip: 'Call ${contact.name}',
+              onPressed: _blocked
+                  ? null
+                  : () => showContactCallDialog(context, contact.name),
+              icon: const Icon(Icons.call_outlined),
+            ),
           PopupMenuButton<String>(
             tooltip: 'Chat options',
-            onSelected: (value) {
-              if (value == 'clear') _confirmAction(context, block: false);
-              if (value == 'block') {
-                if (_blocked) {
-                  setState(() => _blocked = false);
-                } else {
-                  _confirmAction(context, block: true);
-                }
-              }
-            },
-            itemBuilder: (_) => [
-              PopupMenuItem(
-                value: 'clear',
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.delete_outline, color: colors.error),
-                  title: Text(
-                    'Clear history',
-                    style: TextStyle(color: colors.error),
-                  ),
-                ),
-              ),
-              if (!saved)
-                PopupMenuItem(
-                  value: 'block',
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(
-                      _blocked ? Icons.lock_open : Icons.block,
-                      color: _blocked ? colors.primary : colors.error,
-                    ),
-                    title: Text(
-                      _blocked ? 'Unblock user' : 'Block user',
-                      style: TextStyle(
-                        color: _blocked ? colors.primary : colors.error,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
+            enabled: !_contactActionBusy,
+            onSelected: (value) => _contactAction(
+              value == 'clear'
+                  ? ContactAction.clearHistory
+                  : _blocked
+                  ? ContactAction.unblock
+                  : ContactAction.block,
+            ),
+            itemBuilder: (_) => contactActionMenuItems(
+              context,
+              blocked: _blocked,
+              canBlock: contact != null,
+            ),
           ),
         ],
       ),
@@ -454,8 +595,9 @@ class _ChatScreenState extends State<ChatScreen> {
                       title: saved
                           ? 'Your saved messages'
                           : 'Start a conversation',
-                      subtitle:
-                          'Messages are kept only while this screen is open.',
+                      subtitle: _data == null
+                          ? 'Messages are kept only while this screen is open.'
+                          : 'Messages are saved on this device.',
                       icon: saved
                           ? Icons.bookmark_border
                           : Icons.waving_hand_outlined,
@@ -554,9 +696,10 @@ class _ChatScreenState extends State<ChatScreen> {
                             ),
                             tooltip:
                                 '${attachment.file.name} · ${attachment.sizeLabel}',
-                            onDeleted: () => setState(
-                              () => _pendingFiles.remove(attachment),
-                            ),
+                            onDeleted: () {
+                              setState(() => _pendingFiles.remove(attachment));
+                              _scheduleDraft();
+                            },
                           ),
                       ],
                     ),
@@ -569,7 +712,9 @@ class _ChatScreenState extends State<ChatScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(8),
                 child: TextButton(
-                  onPressed: () => setState(() => _blocked = false),
+                  onPressed: _contactActionBusy
+                      ? null
+                      : () => _contactAction(ContactAction.unblock),
                   child: const Text('Unblock user'),
                 ),
               )
@@ -577,7 +722,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ChatComposer(
                 controller: _messageController,
                 showEmoji: _showEmoji,
-                pickingFiles: _pickingFiles,
+                pickingFiles: _pickingFiles || _restoring,
                 hasPendingContent:
                     _pendingFiles.isNotEmpty || _pendingForward != null,
                 onToggleEmoji: () {
@@ -607,7 +752,9 @@ class _Message {
     this.files = const [],
     this.replyPreview,
     this.forwardedFrom,
-  });
+    String? id,
+  }) : id = id ?? DateTime.now().microsecondsSinceEpoch.toString();
+  final String id;
   String text;
   bool edited = false;
   final bool isOwn = true;
@@ -617,6 +764,31 @@ class _Message {
   final String? replyPreview;
   final String? forwardedFrom;
   String? reaction;
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'text': text,
+    'time': time.toIso8601String(),
+    'edited': edited,
+    'reaction': reaction,
+    'reply': replyPreview,
+    'forwarded': forwardedFrom,
+    'files': files.map((f) => f.toJson()).toList(),
+  };
+  factory _Message.fromJson(Map<String, dynamic> json) {
+    final message = _Message(
+      json['text'] as String,
+      DateTime.parse(json['time'] as String),
+      id: json['id'] as String,
+      replyPreview: json['reply'] as String?,
+      forwardedFrom: json['forwarded'] as String?,
+      files: (json['files'] as List? ?? [])
+          .map((f) => _Attachment.fromJson(Map<String, dynamic>.from(f as Map)))
+          .toList(),
+    );
+    message.edited = json['edited'] as bool? ?? false;
+    message.reaction = json['reaction'] as String?;
+    return message;
+  }
 }
 
 class _Attachment {
@@ -624,6 +796,20 @@ class _Attachment {
   // Keep the actual file handle available for a future streamed upload.
   final PlatformFile file;
   final int? size;
+
+  Map<String, dynamic> toJson() => {
+    'name': file.name,
+    'path': file.path,
+    'size': size,
+  };
+  factory _Attachment.fromJson(Map<String, dynamic> json) => _Attachment(
+    StoredPlatformFile(
+      json['name'] as String,
+      json['path'] as String,
+      json['size'] as int?,
+    ),
+    json['size'] as int?,
+  );
 
   String get sizeLabel {
     final bytes = size;

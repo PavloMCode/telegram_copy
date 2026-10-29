@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/auth_api.dart';
+import 'account_data_scope.dart';
 
 /// The signed-in profile shared by all main sections and their detail routes.
 class ProfileScope extends InheritedWidget {
@@ -8,6 +9,7 @@ class ProfileScope extends InheritedWidget {
 
   static const placeholder = AuthProfile('My Name', '+380 99 123 45 67');
   static AuthProfile of(BuildContext context) =>
+      AccountDataScope.maybeOf(context)?.profile ??
       context.dependOnInheritedWidgetOfExactType<ProfileScope>()?.profile ??
       placeholder;
 

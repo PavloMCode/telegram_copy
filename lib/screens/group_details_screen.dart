@@ -60,7 +60,7 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
   }
 
   Future<void> _add(LocalGroup group) async {
-    final candidates = DemoContacts.all
+    final candidates = (widget.store.contactList?.call() ?? DemoContacts.all)
         .where((c) => group.roleOf(c.id) == null)
         .toList();
     final selected = <String>{};

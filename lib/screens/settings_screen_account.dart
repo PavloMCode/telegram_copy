@@ -1,4 +1,7 @@
 import 'dart:typed_data';
+import 'dart:convert';
+import '../services/local_account_store.dart';
+import '../widgets/account_data_scope.dart';
 
 import '../services/profile_photo_picker.dart';
 import '../widgets/confirmation_dialog.dart';
@@ -32,6 +35,74 @@ class _SettingsScreenAccountState extends State<SettingsScreenAccount> {
   bool _changingPhoto = false;
   bool _photoMenuOpen = false;
   bool _loggingOut = false;
+  LocalAccountStore? _data;
+  bool _initializedProfile = false;
+  bool _savingProfile = false;
+  final _values = <String, String>{};
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _data = AccountDataScope.maybeOf(context);
+    if (_data?.loaded == true && !_initializedProfile) {
+      _initializedProfile = true;
+      final profile = _data!.profile;
+      final names = profile.name.trim().split(RegExp(r'\s+'));
+      _values.addAll({
+        'Name': names.first,
+        'Surname': names.skip(1).join(' '),
+        'Phone number': profile.phone,
+        'Nickname': _data!.details['nickname'] as String? ?? '',
+        'About me': _data!.details['about'] as String? ?? '',
+        'Date of birth': _data!.details['birthday'] as String? ?? '',
+      });
+      _avatarPhoto = _data!.photo;
+    }
+  }
+
+  Future<void> _saveProfile() async {
+    if (_savingProfile || _data == null) return;
+    final name = (_values['Name'] ?? '').trim();
+    final phone = (_values['Phone number'] ?? '').trim();
+    if (name.isEmpty ||
+        !RegExp(
+          r'^\+[1-9][0-9]{6,14}$',
+        ).hasMatch(phone.replaceAll(RegExp(r'[ ()-]'), ''))) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Enter your name and a valid phone number.'),
+        ),
+      );
+      return;
+    }
+    setState(() => _savingProfile = true);
+    try {
+      await _data!.saveProfile({
+        'name': [
+          name,
+          _values['Surname'] ?? '',
+        ].where((p) => p.trim().isNotEmpty).join(' '),
+        'phone': phone,
+        'nickname': _values['Nickname'] ?? '',
+        'about': _values['About me'] ?? '',
+        'birthday': _values['Date of birth'] ?? '',
+        'photo': _avatarPhoto == null ? null : base64Encode(_avatarPhoto!),
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Profile saved.')));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not save profile.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _savingProfile = false);
+    }
+  }
 
   Future<void> _logOut() async {
     if (_loggingOut) return;
@@ -248,7 +319,8 @@ class _SettingsScreenAccountState extends State<SettingsScreenAccount> {
           child: SizedBox(
             height: _AccountLayout.fieldHeight,
             child: TextFormField(
-              initialValue: initialValue,
+              initialValue: _values[label] ?? initialValue,
+              onChanged: (text) => _values[label] = text,
               keyboardType:
                   keyboardType ??
                   (maxLines > 1 ? TextInputType.multiline : TextInputType.text),
@@ -399,6 +471,13 @@ class _SettingsScreenAccountState extends State<SettingsScreenAccount> {
             last: true,
           ),
           const SizedBox(height: 24),
+          if (_data != null) ...[
+            FilledButton(
+              onPressed: _savingProfile ? null : _saveProfile,
+              child: Text(_savingProfile ? 'Saving…' : 'Save changes'),
+            ),
+            const SizedBox(height: 16),
+          ],
           OutlinedButton.icon(
             onPressed: _loggingOut ? null : _logOut,
             style: OutlinedButton.styleFrom(

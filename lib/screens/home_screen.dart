@@ -7,6 +7,7 @@ import 'create_conversation_screen.dart';
 import '../services/auth_api.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/search_app_bar.dart';
+import '../widgets/account_data_scope.dart';
 import '../widgets/group_scope.dart';
 import '../services/local_group_store.dart';
 import 'group_chat_screen.dart';
@@ -64,6 +65,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final colors = AppTheme.colorsOf(context);
+    final data = AccountDataScope.maybeOf(context);
     final query = _searchController.text.trim().toLowerCase();
     final localChats = (_groups?.groups ?? []).reversed.map((group) {
       final last = group.messages.isEmpty ? null : group.messages.last;
@@ -81,7 +83,42 @@ class _HomeScreenState extends State<HomeScreen> {
         group: true,
       );
     });
-    final chats = [...localChats, ...demoChats]
+    final directChats = demoChats.map((chat) {
+      final summary = data?.conversations[chat.id];
+      final contact = data?.contact(chat.id);
+      return DemoChat(
+        chat.id,
+        contact?.name ?? chat.name,
+        summary?['preview'] as String? ?? chat.message,
+        chat.time,
+        chat.initials,
+        chat.color,
+        unread: summary == null ? chat.unread : 0,
+        pinned: chat.pinned,
+        muted: chat.muted,
+        group: chat.group,
+        sent: chat.sent,
+      );
+    });
+    final extraChats =
+        (data?.conversations.entries ??
+                <MapEntry<String, Map<String, dynamic>>>[])
+            .where(
+              (entry) =>
+                  !demoChats.any((chat) => chat.id == entry.key) &&
+                  _groups?.find(entry.key) == null,
+            )
+            .map(
+              (entry) => DemoChat(
+                entry.key,
+                data?.contact(entry.key)?.name ?? entry.value['name'] as String,
+                entry.value['preview'] as String? ?? '',
+                '',
+                '?',
+                AppTheme.avatarBlue,
+              ),
+            );
+    final chats = [...localChats, ...extraChats, ...directChats]
         .where(
           (chat) =>
               chat.name.toLowerCase().contains(query) ||

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -31,19 +32,96 @@ class GroupChatScreen extends StatefulWidget {
   State<GroupChatScreen> createState() => _GroupChatScreenState();
 }
 
-class _GroupChatScreenState extends State<GroupChatScreen> {
+class _GroupChatScreenState extends State<GroupChatScreen>
+    with WidgetsBindingObserver {
   final _controller = TextEditingController();
   final _scroll = ScrollController();
   String? _replyPreview;
   final _draft = <GroupMedia>[];
   bool _busy = false;
   bool _emoji = false;
+  bool _restoring = false;
+  Timer? _draftTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _controller.addListener(_scheduleDraft);
+    if (widget.store.database != null) {
+      _restoring = true;
+      _restoreDraft();
+    }
+  }
+
+  Future<void> _restoreDraft() async {
+    try {
+      final draft = await widget.store.database!.get(
+        widget.store.userId,
+        'drafts',
+        widget.groupId,
+      );
+      if (!mounted) return;
+      setState(() {
+        if (draft != null) {
+          _controller.text = draft['text'] as String? ?? '';
+          _replyPreview = draft['reply'] as String?;
+          _draft.addAll(
+            (draft['files'] as List? ?? []).map(
+              (f) => GroupMedia.fromJson(Map<String, dynamic>.from(f as Map)),
+            ),
+          );
+        }
+        _restoring = false;
+      });
+    } catch (error) {
+      if (mounted) {
+        setState(() => _restoring = false);
+        _error(error);
+      }
+    }
+  }
+
+  void _scheduleDraft() {
+    if (widget.store.database == null || _restoring) return;
+    _draftTimer?.cancel();
+    _draftTimer = Timer(
+      const Duration(milliseconds: 300),
+      () => unawaited(_saveDraft().catchError(_error)),
+    );
+  }
+
+  Future<void> _saveDraft() async {
+    if (widget.store.database == null ||
+        _restoring ||
+        widget.store.find(widget.groupId) == null) {
+      return;
+    }
+    await widget.store.database!
+        .put(widget.store.userId, 'drafts', widget.groupId, {
+          'text': _controller.text,
+          'reply': _replyPreview,
+          'files': _draft.map((f) => f.toJson()).toList(),
+        });
+  }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _draftTimer?.cancel();
+    unawaited(_saveDraft().catchError((Object _) {}));
+    _controller.removeListener(_scheduleDraft);
     _controller.dispose();
     _scroll.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) {
+      _draftTimer?.cancel();
+      unawaited(_saveDraft().catchError(_error));
+    }
   }
 
   void _error(Object error) {
@@ -83,6 +161,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         );
         if (!mounted) return;
         setState(() => _draft.add(media));
+        _scheduleDraft();
       }
     } catch (error) {
       _error(error);
@@ -92,7 +171,11 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   }
 
   Future<void> _send() async {
-    if (_busy || _controller.text.trim().isEmpty && _draft.isEmpty) return;
+    if (_busy ||
+        _restoring ||
+        _controller.text.trim().isEmpty && _draft.isEmpty) {
+      return;
+    }
     setState(() => _busy = true);
     try {
       await widget.store.send(
@@ -108,6 +191,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         _replyPreview = null;
         _emoji = false;
       });
+      await _saveDraft();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _scroll.hasClients) {
           _scroll.animateTo(
@@ -284,7 +368,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
             IconButton(
               tooltip: 'Group settings',
               onPressed: _details,
-              icon: const Icon(Icons.info_outline),
+              icon: Icon(Icons.info_outline, color: colors.onPrimary),
             ),
             PopupMenuButton<String>(
               tooltip: 'Chat options',
@@ -293,13 +377,20 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                 if (value == 'clear') _clearHistory();
               },
               itemBuilder: (_) => [
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 'settings',
                   child: Row(
                     children: [
-                      Icon(Icons.group_outlined, size: 21),
-                      SizedBox(width: 12),
-                      Text('Group settings'),
+                      Icon(
+                        Icons.group_outlined,
+                        color: colors.onSurface,
+                        size: 21,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Group settings',
+                        style: TextStyle(color: colors.onSurface),
+                      ),
                     ],
                   ),
                 ),
@@ -421,7 +512,10 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                               tooltip: '${media.name} · ${media.sizeLabel}',
                               onDeleted: _busy
                                   ? null
-                                  : () => setState(() => _draft.remove(media)),
+                                  : () {
+                                      setState(() => _draft.remove(media));
+                                      _scheduleDraft();
+                                    },
                             ),
                         ],
                       ),
@@ -431,7 +525,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
               ChatComposer(
                 controller: _controller,
                 showEmoji: _emoji,
-                pickingFiles: _busy,
+                pickingFiles: _busy || _restoring,
                 hasPendingContent: _draft.isNotEmpty,
                 onToggleEmoji: () {
                   FocusScope.of(context).unfocus();

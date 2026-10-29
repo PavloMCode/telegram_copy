@@ -97,9 +97,13 @@ class LocalGroup {
     required this.members,
     this.photo,
     List<GroupMessage>? messages,
+    this.isChannel = false,
+    this.publicLink,
   }) : messages = messages ?? [];
   final String id;
   String name;
+  final bool isChannel;
+  final String? publicLink;
   String description;
   Uint8List? photo;
   final List<GroupMember> members;
@@ -118,6 +122,8 @@ class LocalGroup {
     'id': id,
     'name': name,
     'description': description,
+    'isChannel': isChannel,
+    'publicLink': publicLink,
     'photo': photo == null ? null : base64Encode(photo!),
     'members': members.map((m) => m.toJson()).toList(),
     'messages': messages.map((m) => m.toJson()).toList(),
@@ -126,6 +132,8 @@ class LocalGroup {
     id: json['id'] as String,
     name: json['name'] as String,
     description: json['description'] as String,
+    isChannel: json['isChannel'] as bool? ?? false,
+    publicLink: json['publicLink'] as String?,
     photo: json['photo'] == null ? null : base64Decode(json['photo'] as String),
     members: (json['members'] as List)
         .map((m) => GroupMember.fromJson(Map<String, dynamic>.from(m as Map)))
