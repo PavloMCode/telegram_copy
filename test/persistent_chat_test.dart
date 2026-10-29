@@ -44,6 +44,60 @@ void main() {
   }
 
   testWidgets(
+    'External forward refreshes an open chat without losing its draft or history',
+    (tester) async {
+      await tester.runAsync(
+        () => data.saveConversation('anna', 'Anna', [
+          {
+            'id': 'old',
+            'text': 'Old history',
+            'time': '2026-10-29T10:00:00',
+            'files': [],
+          },
+        ]),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AccountDataScope(
+            store: data,
+            child: const ChatScreen(chatId: 'anna', chatName: 'Anna'),
+          ),
+        ),
+      );
+      await drain(tester);
+      await tester.enterText(find.byType(TextField), 'Keep my draft');
+      await drain(tester);
+      await tester.runAsync(
+        () => data.appendForwardedMessage('anna', 'Anna', {
+          'id': 'forward',
+          'text': 'Incoming forward',
+          'time': '2026-10-29T11:00:00',
+          'forwarded': 'Team',
+          'files': [],
+        }),
+      );
+      await drain(tester);
+      expect(find.text('Incoming forward'), findsOneWidget);
+      expect(find.text('Old history'), findsOneWidget);
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller!.text,
+        'Keep my draft',
+      );
+      await tester.tap(find.byTooltip('Send message'));
+      await drain(tester);
+      expect(
+        (await tester.runAsync(
+          () => data.messages('anna'),
+        ))!.map((m) => m['text']),
+        ['Keep my draft', 'Incoming forward', 'Old history'],
+      );
+      await tester.pumpWidget(const SizedBox());
+      await drain(tester);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'Direct messages and unsent drafts restore after screen disposal',
     (tester) async {
       Widget app() => MaterialApp(

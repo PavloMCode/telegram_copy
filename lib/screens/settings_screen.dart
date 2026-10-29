@@ -7,6 +7,8 @@ import '../widgets/app_drawer.dart';
 import '../widgets/settings_row.dart';
 import 'settings_screen_account.dart';
 import 'settings_screen_notifications.dart';
+import 'settings_screen_privacy.dart';
+import 'settings_screen_security.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({
@@ -79,7 +81,13 @@ class SettingsScreen extends StatelessWidget {
             Icons.security_outlined,
             'Security',
             'Password and account protection',
-            () {},
+            () => Navigator.push(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) =>
+                    GroupScope.wrap(context, const SettingsScreenSecurity()),
+              ),
+            ),
           ),
           Divider(
             height: 1,
@@ -92,7 +100,13 @@ class SettingsScreen extends StatelessWidget {
             Icons.lock_outline,
             'Privacy',
             'Control who can contact you',
-            () {},
+            () => Navigator.push(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) =>
+                    GroupScope.wrap(context, const SettingsScreenPrivacy()),
+              ),
+            ),
           ),
           const SizedBox(height: 20),
           _sectionTitle('Notifications', colors),

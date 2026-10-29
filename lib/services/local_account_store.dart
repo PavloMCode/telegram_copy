@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../data/demo_data.dart';
+import '../models/notification_category.dart';
 import 'auth_api.dart';
 import 'local_database.dart';
 
@@ -15,6 +16,50 @@ class LocalAccountStore extends ChangeNotifier {
     for (final contact in DemoContacts.all) contact.id: contact,
   };
   Map<String, Map<String, dynamic>> conversations = {};
+  Map<String, Map<String, dynamic>> chatStates = {};
+  final Map<String, int> _forwardVersions = {};
+  int forwardVersion(String id) => _forwardVersions[id] ?? 0;
+
+  Future<void> appendForwardedMessage(
+    String id,
+    String name,
+    Map<String, dynamic> message,
+  ) => _write(() async {
+    final previous = await database?.messages(accountId, id) ?? [];
+    final summary = {
+      'name': name,
+      'preview': message['text'] ?? '',
+      'updated': message['time'] ?? '',
+    };
+    await database?.saveConversation(accountId, id, [
+      message,
+      ...previous,
+    ], summary);
+    conversations = {...conversations, id: summary};
+    _forwardVersions[id] = forwardVersion(id) + 1;
+  });
+  bool isChatDeleted(String id) => conversations[id]?['deleted'] == true;
+  bool isChatPinned(String id) =>
+      chatStates[id]?['pinned'] as bool? ??
+      demoChats.any((chat) => chat.id == id && chat.pinned);
+
+  Future<void> setChatPinned(String id, bool value) => _write(() async {
+    final next = {'pinned': value};
+    await database?.put(accountId, 'chat_state', id, next);
+    chatStates = {...chatStates, id: next};
+  });
+
+  Future<void> deleteConversation(String id) => _write(() async {
+    await database?.deleteConversation(accountId, id);
+    conversations = {
+      ...conversations,
+      id: {'deleted': true},
+    };
+    chatStates = {
+      ...chatStates,
+      id: {'pinned': false},
+    };
+  });
   bool loaded = false;
   String? error;
   Future<void>? _loading;
@@ -31,6 +76,45 @@ class LocalAccountStore extends ChangeNotifier {
       : base64Decode(details['photo'] as String);
   bool setting(String key, {bool fallback = true}) =>
       settings[key] as bool? ?? fallback;
+  T settingValue<T>(String key, {required T fallback}) {
+    final value = settings[key];
+    return value is T ? value : fallback;
+  }
+
+  Map<String, bool> notificationExceptions(NotificationCategory category) {
+    final stored = settings[category.exceptionsKey];
+    return stored is Map
+        ? {
+            for (final entry in stored.entries)
+              if (entry.key is String && entry.value is bool)
+                entry.key as String: entry.value as bool,
+          }
+        : {};
+  }
+
+  bool notificationsEnabledFor(NotificationCategory category, String id) {
+    if (!setting('notifications', fallback: setting('notify_all'))) {
+      return false;
+    }
+    return notificationExceptions(category)[id] ?? setting(category.settingKey);
+  }
+
+  Future<void> setNotificationException(
+    NotificationCategory category,
+    String id,
+    bool? value,
+  ) => _write(() async {
+    final next = notificationExceptions(category);
+    if (value == null) {
+      next.remove(id);
+    } else {
+      next[id] = value;
+    }
+    final preferences = {...settings, category.exceptionsKey: next};
+    await database?.put(accountId, 'settings', 'preferences', preferences);
+    settings = preferences;
+  });
+
   Future<void> load() => _loading ??= _load();
   Future<void> _load() async {
     try {
@@ -60,6 +144,7 @@ class LocalAccountStore extends ChangeNotifier {
           };
         }
         conversations = await database!.all(accountId, 'conversations');
+        chatStates = await database!.all(accountId, 'chat_state');
       }
     } catch (_) {
       error = 'Could not load local data. Please restart the app.';
@@ -88,7 +173,9 @@ class LocalAccountStore extends ChangeNotifier {
     await database?.put(accountId, 'profile', 'self', next);
     details = next;
   });
-  Future<void> setSetting(String key, bool value) => _write(() async {
+  Future<void> setSetting(String key, bool value) =>
+      setSettingValue(key, value);
+  Future<void> setSettingValue(String key, Object? value) => _write(() async {
     final next = {...settings, key: value};
     await database?.put(accountId, 'settings', 'preferences', next);
     settings = next;

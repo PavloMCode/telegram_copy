@@ -12,8 +12,13 @@ import 'main_screen.dart';
 enum _AuthStep { phone, profile, login, code }
 
 class RegistrationScreen extends StatefulWidget {
-  const RegistrationScreen({super.key, this.authApi});
+  const RegistrationScreen({
+    super.key,
+    this.authApi,
+    this.addingAccount = false,
+  });
   final AuthApi? authApi;
+  final bool addingAccount;
 
   @override
   State<RegistrationScreen> createState() => _RegistrationScreenState();
@@ -354,7 +359,13 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           backgroundColor: colors.surface,
           foregroundColor: colors.onSurface,
           leading: _step == _AuthStep.phone
-              ? null
+              ? widget.addingAccount
+                    ? IconButton(
+                        tooltip: 'Cancel adding account',
+                        onPressed: _busy ? null : () => Navigator.pop(context),
+                        icon: const Icon(Icons.close),
+                      )
+                    : null
               : IconButton(
                   tooltip: _step == _AuthStep.profile
                       ? 'Edit phone number'

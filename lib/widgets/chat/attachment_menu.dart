@@ -70,6 +70,12 @@ Future<FileType?> showAttachmentMenu(
                 runSpacing: ChatLayout.space16,
                 children: [
                   option(
+                    'GIF',
+                    Icons.gif_box_outlined,
+                    AppTheme.photoAttachment,
+                    FileType.custom,
+                  ),
+                  option(
                     'Photo',
                     Icons.photo_library_outlined,
                     AppTheme.photoAttachment,

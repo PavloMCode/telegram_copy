@@ -12,6 +12,7 @@ import '../services/local_account_store.dart';
 import 'contacts_screen.dart';
 import 'home_screen.dart';
 import 'settings_screen.dart';
+import '../widgets/auth_session_scope.dart';
 
 /// Main sections share one route; detail screens are pushed above it.
 class MainScreen extends StatefulWidget {
@@ -78,38 +79,42 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => AccountDataScope(
-    store: _data,
-    child: ContactScope(
-      store: _contacts,
-      child: GroupScope(
-        store: _groups,
-        child: ProfileScope(
-          profile: widget.profile ?? AuthProfile(widget.userName, widget.phone),
-          child: IndexedStack(
-            index: _section.index,
-            children: [
-              for (final section in MainSection.values)
-                // Hidden sections must not duplicate the active section's FAB hero.
-                HeroMode(
-                  enabled: _section == section,
-                  child: switch (section) {
-                    MainSection.chats => HomeScreen(
-                      userName: widget.profile?.name ?? widget.userName,
-                      phone: widget.profile?.phone ?? widget.phone,
-                      authApi: widget.authApi,
-                      onSectionSelected: _selectSection,
-                    ),
-                    MainSection.contacts => ContactsScreen(
-                      onSectionSelected: _selectSection,
-                    ),
-                    MainSection.settings => SettingsScreen(
-                      authApi: widget.authApi,
-                      onSectionSelected: _selectSection,
-                    ),
-                  },
-                ),
-            ],
+  Widget build(BuildContext context) => AuthSessionScope(
+    api: widget.authApi,
+    child: AccountDataScope(
+      store: _data,
+      child: ContactScope(
+        store: _contacts,
+        child: GroupScope(
+          store: _groups,
+          child: ProfileScope(
+            profile:
+                widget.profile ?? AuthProfile(widget.userName, widget.phone),
+            child: IndexedStack(
+              index: _section.index,
+              children: [
+                for (final section in MainSection.values)
+                  // Hidden sections must not duplicate the active section's FAB hero.
+                  HeroMode(
+                    enabled: _section == section,
+                    child: switch (section) {
+                      MainSection.chats => HomeScreen(
+                        userName: widget.profile?.name ?? widget.userName,
+                        phone: widget.profile?.phone ?? widget.phone,
+                        authApi: widget.authApi,
+                        onSectionSelected: _selectSection,
+                      ),
+                      MainSection.contacts => ContactsScreen(
+                        onSectionSelected: _selectSection,
+                      ),
+                      MainSection.settings => SettingsScreen(
+                        authApi: widget.authApi,
+                        onSectionSelected: _selectSection,
+                      ),
+                    },
+                  ),
+              ],
+            ),
           ),
         ),
       ),

@@ -11,6 +11,7 @@ import '../widgets/account_data_scope.dart';
 import '../widgets/group_scope.dart';
 import '../services/local_group_store.dart';
 import 'group_chat_screen.dart';
+import '../widgets/chat_list_actions.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -81,6 +82,7 @@ class _HomeScreenState extends State<HomeScreen> {
         group.name.characters.first.toUpperCase(),
         AppTheme.avatarBlue,
         group: true,
+        pinned: data?.isChatPinned(group.id) ?? false,
       );
     });
     final directChats = demoChats.map((chat) {
@@ -94,7 +96,7 @@ class _HomeScreenState extends State<HomeScreen> {
         chat.initials,
         chat.color,
         unread: summary == null ? chat.unread : 0,
-        pinned: chat.pinned,
+        pinned: data?.isChatPinned(chat.id) ?? chat.pinned,
         muted: chat.muted,
         group: chat.group,
         sent: chat.sent,
@@ -106,6 +108,7 @@ class _HomeScreenState extends State<HomeScreen> {
             .where(
               (entry) =>
                   !demoChats.any((chat) => chat.id == entry.key) &&
+                  !data!.isChatDeleted(entry.key) &&
                   _groups?.find(entry.key) == null,
             )
             .map(
@@ -116,15 +119,21 @@ class _HomeScreenState extends State<HomeScreen> {
                 '',
                 '?',
                 AppTheme.avatarBlue,
+                pinned: data?.isChatPinned(entry.key) ?? false,
               ),
             );
     final chats = [...localChats, ...extraChats, ...directChats]
         .where(
           (chat) =>
-              chat.name.toLowerCase().contains(query) ||
-              chat.message.toLowerCase().contains(query),
+              !(data?.isChatDeleted(chat.id) ?? false) &&
+              (chat.name.toLowerCase().contains(query) ||
+                  chat.message.toLowerCase().contains(query)),
         )
         .toList();
+    final orderedChats = [
+      ...chats.where((chat) => chat.pinned),
+      ...chats.where((chat) => !chat.pinned),
+    ];
     return Scaffold(
       backgroundColor: colors.surface,
       appBar: SearchAppBar(
@@ -171,7 +180,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   endIndent: 16,
                   color: colors.subtleDivider,
                 ),
-                itemBuilder: (context, index) => _tile(context, chats[index]),
+                itemBuilder: (context, index) =>
+                    _tile(context, orderedChats[index]),
               ),
       ),
       floatingActionButton: FloatingActionButton(
@@ -193,6 +203,37 @@ class _HomeScreenState extends State<HomeScreen> {
     return Material(
       color: colors.surface,
       child: InkWell(
+        onLongPress: () async {
+          final data = AccountDataScope.maybeOf(context);
+          if (data == null || !data.loaded || data.error != null) return;
+          final action = await showModalBottomSheet<String>(
+            context: context,
+            showDragHandle: true,
+            useSafeArea: true,
+            builder: (sheetContext) => SafeArea(
+              top: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.push_pin_outlined),
+                    title: Text(chat.pinned ? 'Unpin chat' : 'Pin chat'),
+                    onTap: () => Navigator.pop(sheetContext, 'pin_chat'),
+                  ),
+                  if (group == null)
+                    ListTile(
+                      leading: const Icon(Icons.delete_outline),
+                      title: const Text('Delete chat'),
+                      onTap: () => Navigator.pop(sheetContext, 'delete_chat'),
+                    ),
+                ],
+              ),
+            ),
+          );
+          if (context.mounted && action != null) {
+            await performChatListAction(context, chat.id, action);
+          }
+        },
         onTap: () => _open(
           group == null
               ? ChatScreen(chatId: chat.id, chatName: chat.name)

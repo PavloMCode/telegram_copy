@@ -4,6 +4,10 @@ import '../screens/chat_screen.dart';
 import '../theme/app_theme.dart';
 import 'drawer_profile_header.dart';
 import 'group_scope.dart';
+import 'auth_session_scope.dart';
+import 'account_data_scope.dart';
+import '../services/local_auth_api.dart';
+import '../screens/accounts_screen.dart';
 
 abstract final class _DrawerLayout {
   static const width = 280.0;
@@ -91,6 +95,7 @@ class AppDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = AppTheme.colorsOf(context);
+    final api = AuthSessionScope.maybeOf(context);
     return Drawer(
       width: _DrawerLayout.width,
       child: ListView(
@@ -98,6 +103,24 @@ class AppDrawer extends StatelessWidget {
         children: [
           const DrawerProfileHeader(),
           const SizedBox(height: _DrawerLayout.headerGap),
+          if (api is LocalAuthApi)
+            _drawerItem(
+              colors,
+              title: 'Accounts',
+              icon: Icons.manage_accounts_outlined,
+              onTap: () {
+                final activeId = AccountDataScope.maybeOf(context)!.accountId;
+                Scaffold.of(context).closeDrawer();
+                final screen = GroupScope.wrap(
+                  context,
+                  AccountsScreen(api: api, activeId: activeId),
+                );
+                Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(builder: (_) => screen),
+                );
+              },
+            ),
           _drawerItem(
             colors,
             title: 'Chats',

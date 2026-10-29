@@ -1,6 +1,10 @@
 import 'dart:async';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import '../widgets/chat/gif_attachment.dart';
+import '../widgets/chat/forward_message.dart';
+import '../widgets/account_data_scope.dart';
+import '../widgets/chat_list_actions.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import '../widgets/chat/chat_layout.dart';
@@ -151,13 +155,17 @@ class _GroupChatScreenState extends State<GroupChatScreen>
     };
     setState(() => _busy = true);
     try {
-      final files = await FilePicker.pickFiles(type: type);
+      final files = await FilePicker.pickFiles(
+        type: type,
+        allowedExtensions: type == FileType.custom ? ['gif'] : null,
+      );
       for (final file in files) {
+        if (type == FileType.custom) await validateGif(file);
         final media = await saveGroupMedia(
           widget.store.userId,
           widget.groupId,
           file,
-          kind,
+          file.name.toLowerCase().endsWith('.gif') ? GroupMediaKind.gif : kind,
         );
         if (!mounted) return;
         setState(() => _draft.add(media));
@@ -279,7 +287,7 @@ class _GroupChatScreenState extends State<GroupChatScreen>
       context,
       position,
       reaction: message.reaction,
-      canForward: false,
+      canEdit: message.forwardedFrom == null,
       emptyText: message.text.isEmpty,
     );
     if (!mounted ||
@@ -292,6 +300,22 @@ class _GroupChatScreenState extends State<GroupChatScreen>
       return;
     }
     switch (action) {
+      case 'forward':
+        setState(() => _busy = true);
+        try {
+          await forwardChatMessage(
+            context,
+            sourceId: widget.groupId,
+            origin:
+                message.forwardedFrom ??
+                widget.store.find(widget.groupId)!.name,
+            text: message.text,
+            attachments: message.media.map(forwardedGroupMedia).toList(),
+            fallbackGroups: widget.store,
+          );
+        } finally {
+          if (mounted) setState(() => _busy = false);
+        }
       case 'copy':
         await Clipboard.setData(
           ClipboardData(
@@ -350,6 +374,7 @@ class _GroupChatScreenState extends State<GroupChatScreen>
         );
       }
       final colors = AppTheme.colorsOf(context);
+      final data = AccountDataScope.maybeOf(context);
       return Scaffold(
         appBar: AppBar(
           elevation: 0,
@@ -372,11 +397,26 @@ class _GroupChatScreenState extends State<GroupChatScreen>
             ),
             PopupMenuButton<String>(
               tooltip: 'Chat options',
-              onSelected: (value) {
+              enabled: !_busy,
+              onSelected: (value) async {
+                if (value == 'pin_chat') {
+                  setState(() => _busy = true);
+                  try {
+                    await performChatListAction(context, widget.groupId, value);
+                  } finally {
+                    if (mounted) setState(() => _busy = false);
+                  }
+                  return;
+                }
                 if (value == 'settings') _details();
                 if (value == 'clear') _clearHistory();
               },
               itemBuilder: (_) => [
+                if (data != null && data.loaded && data.error == null)
+                  ...chatListMenuItems(
+                    pinned: data.isChatPinned(widget.groupId),
+                    allowDelete: false,
+                  ),
                 PopupMenuItem(
                   value: 'settings',
                   child: Row(
@@ -452,6 +492,7 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                                 text: message.text,
                                 time: message.sentAt,
                                 edited: message.edited,
+                                forwardedFrom: message.forwardedFrom,
                                 replyPreview: message.replyPreview,
                                 reaction: message.reaction,
                                 attachments: [

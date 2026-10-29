@@ -2,6 +2,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import '../models/local_group.dart';
 import '../services/group_media_files.dart';
+import '../services/stored_platform_file.dart';
+import 'chat/gif_attachment.dart';
 
 class GroupMediaTile extends StatelessWidget {
   const GroupMediaTile({super.key, required this.media, this.compact = false});
@@ -25,6 +27,25 @@ class GroupMediaTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (media.kind == GroupMediaKind.gif ||
+        media.name.toLowerCase().endsWith('.gif')) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          GifAttachment(
+            file: StoredPlatformFile(media.name, media.path, media.size),
+            sourceId: media.path,
+          ),
+          if (!compact)
+            TextButton.icon(
+              onPressed: () => _export(context),
+              icon: const Icon(Icons.download_outlined),
+              label: const Text('Save GIF'),
+            ),
+        ],
+      );
+    }
     final tile = ListTile(
       contentPadding: EdgeInsets.zero,
       leading: media.kind == GroupMediaKind.photo
@@ -102,6 +123,7 @@ class GroupMediaTile extends StatelessWidget {
                 GroupMediaKind.video => Icons.videocam_outlined,
                 GroupMediaKind.voice => Icons.mic_none_rounded,
                 GroupMediaKind.file => Icons.insert_drive_file_outlined,
+                GroupMediaKind.gif => Icons.gif_box_outlined,
               }),
             ),
             const SizedBox(width: 12),

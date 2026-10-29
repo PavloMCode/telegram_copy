@@ -8,6 +8,8 @@ import '../widgets/confirmation_dialog.dart';
 import '../widgets/profile_scope.dart';
 import 'package:flutter/material.dart';
 import '../services/auth_api.dart';
+import '../services/local_auth_api.dart';
+import 'main_screen.dart';
 import 'registration_screen.dart';
 import '../theme/app_theme.dart';
 
@@ -120,8 +122,12 @@ class _SettingsScreenAccountState extends State<SettingsScreenAccount> {
       setState(() => _loggingOut = false);
       return;
     }
+    AuthProfile? remainingProfile;
     try {
       await (widget.authApi ?? AuthApi.instance).logout();
+      if (widget.authApi case final LocalAuthApi local) {
+        remainingProfile = await local.restoreSession();
+      }
     } catch (_) {
       if (!mounted) return;
       setState(() => _loggingOut = false);
@@ -133,7 +139,9 @@ class _SettingsScreenAccountState extends State<SettingsScreenAccount> {
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute<void>(
-        builder: (_) => RegistrationScreen(authApi: widget.authApi),
+        builder: (_) => remainingProfile == null
+            ? RegistrationScreen(authApi: widget.authApi)
+            : MainScreen(profile: remainingProfile, authApi: widget.authApi),
       ),
       (_) => false,
     );

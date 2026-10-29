@@ -367,6 +367,7 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
                 ),
                 for (final (kind, label) in [
                   (GroupMediaKind.photo, 'Photos'),
+                  (GroupMediaKind.gif, 'GIFs'),
                   (GroupMediaKind.video, 'Videos'),
                   (GroupMediaKind.voice, 'Voice'),
                   (GroupMediaKind.file, 'Files'),

@@ -20,7 +20,7 @@ class GroupMember {
   );
 }
 
-enum GroupMediaKind { photo, video, voice, file }
+enum GroupMediaKind { photo, video, voice, file, gif }
 
 class GroupMedia {
   const GroupMedia({
@@ -59,6 +59,7 @@ class GroupMessage {
     this.replyPreview,
     this.edited = false,
     this.reaction,
+    this.forwardedFrom,
   });
   final String id;
   String text;
@@ -67,6 +68,7 @@ class GroupMessage {
   final String? replyPreview;
   bool edited;
   String? reaction;
+  final String? forwardedFrom;
   Map<String, dynamic> toJson() => {
     'id': id,
     'text': text,
@@ -75,6 +77,7 @@ class GroupMessage {
     'replyPreview': replyPreview,
     'edited': edited,
     'reaction': reaction,
+    'forwardedFrom': forwardedFrom,
   };
   factory GroupMessage.fromJson(Map<String, dynamic> json) => GroupMessage(
     id: json['id'] as String,
@@ -83,6 +86,7 @@ class GroupMessage {
     replyPreview: json['replyPreview'] as String?,
     edited: json['edited'] as bool? ?? false,
     reaction: json['reaction'] as String?,
+    forwardedFrom: json['forwardedFrom'] as String?,
     media: (json['media'] as List)
         .map((m) => GroupMedia.fromJson(Map<String, dynamic>.from(m as Map)))
         .toList(),

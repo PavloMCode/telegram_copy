@@ -154,6 +154,31 @@ class LocalDatabase {
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   });
 
+  Future<void> deleteConversation(String account, String chat) =>
+      _database.transaction((db) async {
+        await db.delete(
+          'messages',
+          where: 'account=? AND chat=?',
+          whereArgs: [account, chat],
+        );
+        await db.delete(
+          'records',
+          where: 'account=? AND bucket=? AND id=?',
+          whereArgs: [account, 'drafts', chat],
+        );
+        for (final entry in {
+          'conversations': {'deleted': true},
+          'chat_state': {'pinned': false},
+        }.entries) {
+          await db.insert('records', {
+            'account': account,
+            'bucket': entry.key,
+            'id': chat,
+            'payload': jsonEncode(entry.value),
+          }, conflictAlgorithm: ConflictAlgorithm.replace);
+        }
+      });
+
   Future<void> saveGroups(String account, List<Map<String, dynamic>> groups) =>
       _database.transaction((db) async {
         final previous = await db.query(

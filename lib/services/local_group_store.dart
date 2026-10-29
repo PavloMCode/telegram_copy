@@ -30,6 +30,7 @@ class LocalGroupStore extends ChangeNotifier {
   bool _disposed = false;
 
   Future<void> load() => _loading ??= _load();
+  Future<void> flush() => _writes;
   Future<void> _load() async {
     try {
       final preferences = await SharedPreferences.getInstance();
@@ -246,8 +247,14 @@ class LocalGroupStore extends ChangeNotifier {
     String text,
     List<GroupMedia> media, {
     String? replyPreview,
+    String? forwardedFrom,
   }) => _commit((groups) {
     final group = _require(groups, id);
+    if (group.isChannel && !group.canManage(userId)) {
+      throw const GroupException(
+        'Only administrators can post in this channel.',
+      );
+    }
     if (text.trim().isEmpty && media.isEmpty) return;
     group.messages.add(
       GroupMessage(
@@ -256,6 +263,7 @@ class LocalGroupStore extends ChangeNotifier {
         sentAt: DateTime.now(),
         media: List.of(media),
         replyPreview: replyPreview,
+        forwardedFrom: forwardedFrom,
       ),
     );
   });
@@ -268,6 +276,9 @@ class LocalGroupStore extends ChangeNotifier {
             .firstOrNull;
         if (message == null) {
           throw const GroupException('This message is no longer available.');
+        }
+        if (message.forwardedFrom != null) {
+          throw const GroupException('Forwarded messages cannot be edited.');
         }
         if (text.trim().isEmpty && message.media.isEmpty) {
           throw const GroupException('A message cannot be empty.');

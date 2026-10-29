@@ -11,6 +11,9 @@ import 'auth_api.dart';
 class LocalAuthApi extends AuthApi {
   static const _storageKey = 'debug_auth_accounts_v1';
   static const _sessionKey = 'debug_auth_session_v1';
+  static const _sessionsKey = 'debug_auth_sessions_v2';
+  static const _notifyAllKey = 'notifications_all_accounts_v1';
+  static Future<void> _sessionWrites = Future.value();
   Map<String, dynamic>? _pending;
   String? _challengeId;
   bool _registering = false;
@@ -34,18 +37,97 @@ class LocalAuthApi extends AuthApi {
   String _digest(String salt, String password) =>
       sha256.convert(utf8.encode('$salt:$password')).toString();
 
-  Future<AuthProfile?> restoreSession() async {
+  Future<Map<String, dynamic>> _sessions() async {
     _requireDebug();
     final preferences = await SharedPreferences.getInstance();
-    final email = preferences.getString(_sessionKey);
-    if (email == null) return null;
+    final stored = preferences.getString(_sessionsKey);
+    if (stored != null) return jsonDecode(stored) as Map<String, dynamic>;
+    final legacy = preferences.getString(_sessionKey);
+    return {
+      'active': legacy,
+      'emails': [?legacy],
+    };
+  }
+
+  Future<void> _changeSessions(
+    Future<void> Function(Map<String, dynamic>) change,
+  ) {
+    final operation = _sessionWrites.then((_) async {
+      final sessions = await _sessions();
+      await change(sessions);
+      final preferences = await SharedPreferences.getInstance();
+      if (!await preferences.setString(_sessionsKey, jsonEncode(sessions))) {
+        throw const AuthException(
+          'Could not save account sessions. Please try again.',
+        );
+      }
+    });
+    _sessionWrites = operation.catchError((Object _) {});
+    return operation;
+  }
+
+  Future<List<AuthProfile>> signedInProfiles() async {
+    final sessions = await _sessions();
+    final accounts = await _accounts();
+    return [
+      for (final email in (sessions['emails'] as List))
+        if (accounts[email] case final Map account)
+          AuthProfile(account['name'] as String, account['phone'] as String),
+    ];
+  }
+
+  Future<AuthProfile?> restoreSession() async {
+    final sessions = await _sessions();
+    final email = sessions['active'] as String?;
     final accounts = await _accounts();
     final account = accounts[email] as Map<String, dynamic>?;
-    if (account == null) {
-      await preferences.remove(_sessionKey);
-      return null;
-    }
+    if (account == null) return null;
     return AuthProfile(account['name'] as String, account['phone'] as String);
+  }
+
+  Future<AuthProfile> switchAccount(String phone) async {
+    late AuthProfile profile;
+    await _changeSessions((sessions) async {
+      final accounts = await _accounts();
+      final email = (sessions['emails'] as List)
+          .cast<String>()
+          .where((email) => (accounts[email] as Map?)?['phone'] == phone)
+          .firstOrNull;
+      if (email == null) {
+        throw const AuthException('Sign in to this account again.');
+      }
+      final account = accounts[email] as Map;
+      profile = AuthProfile(
+        account['name'] as String,
+        account['phone'] as String,
+      );
+      sessions['active'] = email;
+    });
+    return profile;
+  }
+
+  Future<bool> notificationsFromAllAccounts() async {
+    _requireDebug();
+    return (await SharedPreferences.getInstance()).getBool(_notifyAllKey) ??
+        true;
+  }
+
+  Future<void> setNotificationsFromAllAccounts(bool value) async {
+    _requireDebug();
+    if (!await (await SharedPreferences.getInstance()).setBool(
+      _notifyAllKey,
+      value,
+    )) {
+      throw const AuthException('Could not save notification preferences.');
+    }
+  }
+
+  Future<bool> shouldNotifyAccount(String phone) async {
+    if (!(await signedInProfiles()).any((profile) => profile.phone == phone)) {
+      return false;
+    }
+    return await notificationsFromAllAccounts() ||
+        (await restoreSession())?.phone == phone;
   }
 
   AuthChallenge _issue() {
@@ -66,9 +148,19 @@ class LocalAuthApi extends AuthApi {
   }) async {
     final accounts = await _accounts();
     final normalizedEmail = email.trim().toLowerCase();
+    final normalizedPhone = phone.replaceAll(RegExp(r'[ ()-]'), '');
     if (accounts.containsKey(normalizedEmail)) {
       throw const AuthException(
         'This email is already registered. Please sign in.',
+      );
+    }
+    if (accounts.values.any(
+      (account) =>
+          (account['phone'] as String).replaceAll(RegExp(r'[ ()-]'), '') ==
+          normalizedPhone,
+    )) {
+      throw const AuthException(
+        'This phone number is already registered. Please sign in.',
       );
     }
     final random = Random.secure();
@@ -76,7 +168,7 @@ class LocalAuthApi extends AuthApi {
     _pending = {
       'email': normalizedEmail,
       'name': name.trim(),
-      'phone': phone.trim(),
+      'phone': normalizedPhone,
       'salt': salt,
       'passwordHash': _digest(salt, password),
     };
@@ -118,22 +210,37 @@ class LocalAuthApi extends AuthApi {
     if (account == null || challengeId != _challengeId || code != '123456') {
       throw const AuthException('Invalid verification code.');
     }
-    if (_registering) {
-      final accounts = await _accounts();
-      accounts[account['email'] as String] = account;
-      final preferences = await SharedPreferences.getInstance();
-      if (!await preferences.setString(_storageKey, jsonEncode(accounts))) {
-        throw const AuthException(
-          'Could not save the local profile. Please try again.',
-        );
+    await _changeSessions((sessions) async {
+      if (_registering) {
+        final accounts = await _accounts();
+        if (accounts.containsKey(account['email']) ||
+            accounts.values.any(
+              (existing) =>
+                  (existing['phone'] as String).replaceAll(
+                    RegExp(r'[ ()-]'),
+                    '',
+                  ) ==
+                  account['phone'],
+            )) {
+          throw const AuthException(
+            'This account is already registered. Please sign in.',
+          );
+        }
+        accounts[account['email'] as String] = account;
+        final preferences = await SharedPreferences.getInstance();
+        if (!await preferences.setString(_storageKey, jsonEncode(accounts))) {
+          throw const AuthException(
+            'Could not save the local profile. Please try again.',
+          );
+        }
+        // A retry after a session-write failure must not register twice.
+        _registering = false;
       }
-    }
-    final preferences = await SharedPreferences.getInstance();
-    if (!await preferences.setString(_sessionKey, account['email'] as String)) {
-      throw const AuthException(
-        'Could not save the local session. Please try again.',
-      );
-    }
+      final emails = (sessions['emails'] as List).cast<String>().toSet()
+        ..add(account['email'] as String);
+      sessions['emails'] = emails.toList();
+      sessions['active'] = account['email'];
+    });
     _pending = null;
     _challengeId = null;
     return AuthProfile(account['name'] as String, account['phone'] as String);
@@ -142,12 +249,14 @@ class LocalAuthApi extends AuthApi {
   @override
   Future<void> logout() async {
     _requireDebug();
-    final preferences = await SharedPreferences.getInstance();
-    if (!await preferences.remove(_sessionKey)) {
-      throw const AuthException(
-        'Could not clear the local session. Please try again.',
-      );
-    }
+    await _changeSessions((sessions) async {
+      final emails = (sessions['emails'] as List).cast<String>()
+        ..remove(sessions['active']);
+      final accounts = await _accounts();
+      emails.removeWhere((email) => !accounts.containsKey(email));
+      sessions['emails'] = emails;
+      sessions['active'] = emails.firstOrNull;
+    });
     _pending = null;
     _challengeId = null;
   }
