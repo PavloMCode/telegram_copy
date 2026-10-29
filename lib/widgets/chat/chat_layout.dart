@@ -1,0 +1,31 @@
+abstract final class ChatLayout {
+  static const space4 = 4.0;
+  static const space8 = 8.0;
+  static const space12 = 12.0;
+  static const space16 = 16.0;
+  static const space24 = 24.0;
+
+  static const appBarHeight = 64.0;
+  static const avatarSize = 36.0;
+  static const nameFontSize = 16.0;
+  static const statusFontSize = 11.0;
+  static const bubbleWidthFraction = 0.72;
+  static const bubbleRadius = 16.0;
+  static const bubbleTailCornerRadius = 6.0;
+  static const tailWidth = 10.0;
+  static const tailHeight = 8.0;
+  static const messageFontSize = 14.0;
+  static const timeFontSize = 10.0;
+  static const bubbleGap = 6.0;
+  static const dateHeight = 24.0;
+  static const dateHorizontalPadding = 10.0;
+  static const dateRadius = 12.0;
+  static const dateFontSize = 10.0;
+  static const minComposerHeight = 64.0;
+  static const minInputHeight = 48.0;
+  static const maxInputLines = 6;
+  static const inputRadius = 24.0;
+  static const iconSize = 22.0;
+  static const sendButtonSize = 44.0;
+  static const sendButtonRadius = 22.0;
+}

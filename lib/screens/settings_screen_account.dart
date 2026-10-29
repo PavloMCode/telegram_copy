@@ -1,6 +1,8 @@
 import 'dart:typed_data';
 
-import 'package:file_picker/file_picker.dart';
+import '../services/profile_photo_picker.dart';
+import '../widgets/confirmation_dialog.dart';
+import '../widgets/profile_scope.dart';
 import 'package:flutter/material.dart';
 import '../services/auth_api.dart';
 import 'registration_screen.dart';
@@ -35,27 +37,12 @@ class _SettingsScreenAccountState extends State<SettingsScreenAccount> {
     if (_loggingOut) return;
     FocusScope.of(context).unfocus();
     setState(() => _loggingOut = true);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Log out?'),
-        content: const Text(
+    final confirmed = await showConfirmationDialog(
+      context,
+      title: 'Log out?',
+      message:
           'You can sign in again with your email, password and verification code.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: Text(
-              'Log out',
-              style: TextStyle(color: AppTheme.colorsOf(dialogContext).error),
-            ),
-          ),
-        ],
-      ),
+      confirmLabel: 'Log out',
     );
     if (!mounted) return;
     if (confirmed != true) {
@@ -132,15 +119,8 @@ class _SettingsScreenAccountState extends State<SettingsScreenAccount> {
       if (!mounted || choosePhoto != true) return;
 
       setState(() => _changingPhoto = true);
-      final photo = await FilePicker.pickFile(type: FileType.image);
-      if (!mounted || photo == null) return;
-      final bytes = await photo.readAsBytes();
-      if (!mounted) return;
-
-      // Check that the file can be displayed before replacing the current photo.
-      final image = await decodeImageFromList(bytes);
-      image.dispose();
-      if (!mounted) return;
+      final bytes = await pickProfilePhoto();
+      if (!mounted || bytes == null) return;
       setState(() => _avatarPhoto = bytes);
     } catch (_) {
       if (mounted) {
@@ -248,6 +228,7 @@ class _SettingsScreenAccountState extends State<SettingsScreenAccount> {
     TextInputType? keyboardType,
     TextCapitalization capitalization = TextCapitalization.none,
     Iterable<String>? autofillHints,
+    String? initialValue,
     String? helperText,
     int maxLines = 1,
     bool last = false,
@@ -267,6 +248,7 @@ class _SettingsScreenAccountState extends State<SettingsScreenAccount> {
           child: SizedBox(
             height: _AccountLayout.fieldHeight,
             child: TextFormField(
+              initialValue: initialValue,
               keyboardType:
                   keyboardType ??
                   (maxLines > 1 ? TextInputType.multiline : TextInputType.text),
@@ -331,6 +313,8 @@ class _SettingsScreenAccountState extends State<SettingsScreenAccount> {
   @override
   Widget build(BuildContext context) {
     final colors = AppTheme.colorsOf(context);
+    final profile = ProfileScope.of(context);
+    final names = profile.name.trim().split(RegExp(r'\s+'));
     return Scaffold(
       appBar: AppBar(title: const Text('Account')),
       body: ListView(
@@ -364,6 +348,7 @@ class _SettingsScreenAccountState extends State<SettingsScreenAccount> {
             Icons.person_outline,
             capitalization: TextCapitalization.words,
             autofillHints: const [AutofillHints.givenName],
+            initialValue: names.first,
           ),
           _field(
             colors,
@@ -372,6 +357,7 @@ class _SettingsScreenAccountState extends State<SettingsScreenAccount> {
             Icons.badge_outlined,
             capitalization: TextCapitalization.words,
             autofillHints: const [AutofillHints.familyName],
+            initialValue: names.skip(1).join(' '),
           ),
           _field(
             colors,
@@ -408,6 +394,7 @@ class _SettingsScreenAccountState extends State<SettingsScreenAccount> {
             Icons.phone_outlined,
             keyboardType: TextInputType.phone,
             autofillHints: const [AutofillHints.telephoneNumber],
+            initialValue: profile.phone,
             helperText: 'Include your country code',
             last: true,
           ),

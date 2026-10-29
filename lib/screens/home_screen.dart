@@ -1,20 +1,15 @@
 import 'package:flutter/material.dart';
 import '../navigation/main_section.dart';
 import '../theme/app_theme.dart';
+import '../data/demo_data.dart';
 import 'chat_screen.dart';
 import 'create_conversation_screen.dart';
 import '../services/auth_api.dart';
-
-abstract final class _HomeDrawerLayout {
-  static const width = 280.0;
-  static const headerHeight = 160.0;
-  static const avatarSize = 72.0;
-  static const itemHeight = 52.0;
-  static const iconSize = 22.0;
-  static const horizontalPadding = 16.0;
-  static const selectedRadius = 12.0;
-  static const headerGap = 12.0;
-}
+import '../widgets/app_drawer.dart';
+import '../widgets/search_app_bar.dart';
+import '../widgets/group_scope.dart';
+import '../services/local_group_store.dart';
+import 'group_chat_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -36,335 +31,57 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final _searchController = TextEditingController();
-  bool _isSearching = false;
+  LocalGroupStore? _groups;
 
-  // Demo data until conversations are loaded from the server.
-  static const _chats = [
-    _Chat(
-      'saved',
-      'Saved Messages',
-      'Your notes, links and favourite messages',
-      '12:42',
-      '★',
-      AppTheme.avatarBlue,
-      pinned: true,
-      sent: true,
-    ),
-    _Chat(
-      'study',
-      'Study Group',
-      'Olena: See you at the next lecture!',
-      '12:35',
-      'SG',
-      AppTheme.avatarPurple,
-      unread: 12,
-      pinned: true,
-      group: true,
-    ),
-    _Chat(
-      'anna',
-      'Anna',
-      'Are we meeting at 3?',
-      '12:28',
-      'A',
-      AppTheme.avatarPeach,
-      unread: 2,
-    ),
-    _Chat(
-      'maksym',
-      'Maksym',
-      'Thanks! I’ll check it out',
-      '11:54',
-      'M',
-      AppTheme.avatarMint,
-      sent: true,
-    ),
-    _Chat(
-      'flutter',
-      'Flutter Community',
-      'New resources for your next project',
-      '11:20',
-      'FC',
-      AppTheme.avatarTeal,
-      unread: 128,
-      muted: true,
-      group: true,
-    ),
-    _Chat('olena', 'Olena', 'Photo', '10:46', 'O', AppTheme.avatarPink),
-    _Chat(
-      'project',
-      'Messenger Project',
-      'You: Updated the home screen',
-      'Yesterday',
-      'MP',
-      AppTheme.avatarSlate,
-      muted: true,
-      group: true,
-      sent: true,
-    ),
-    _Chat(
-      'andrii',
-      'Andrii',
-      'Sounds good 👍',
-      'Yesterday',
-      'A',
-      AppTheme.avatarGold,
-      sent: true,
-    ),
-  ];
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final groups = GroupScope.maybeOf(context);
+    if (_groups != groups) {
+      _groups?.removeListener(_onGroupsChanged);
+      _groups = groups;
+      _groups?.addListener(_onGroupsChanged);
+    }
+  }
+
+  void _onGroupsChanged() {
+    if (mounted) setState(() {});
+  }
 
   @override
   void dispose() {
+    _groups?.removeListener(_onGroupsChanged);
     _searchController.dispose();
     super.dispose();
   }
 
-  void _open(Widget screen, {bool fromDrawer = false}) {
-    if (fromDrawer) Navigator.pop(context);
-    Navigator.push(context, MaterialPageRoute<void>(builder: (_) => screen));
-  }
-
-  void _showCreatePanel(BuildContext context, {bool fromDrawer = false}) {
-    if (fromDrawer) Navigator.pop(context);
+  void _open(Widget screen) {
     FocusScope.of(context).unfocus();
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      useSafeArea: true,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      builder: (sheetContext) {
-        final colors = AppTheme.colorsOf(sheetContext);
-        Widget action(
-          String title,
-          String subtitle,
-          IconData icon,
-          Widget screen,
-        ) {
-          return ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 20,
-              vertical: 4,
-            ),
-            leading: CircleAvatar(
-              backgroundColor: colors.createActionBackground,
-              foregroundColor: colors.createActionForeground,
-              child: Icon(icon),
-            ),
-            title: Text(
-              title,
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            subtitle: Text(subtitle),
-            trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: () {
-              Navigator.pop(sheetContext);
-              _open(screen);
-            },
-          );
-        }
-
-        return SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Text(
-                    'Create',
-                    style: Theme.of(sheetContext).textTheme.titleLarge,
-                  ),
-                ),
-                action(
-                  'New chat',
-                  'Start a conversation',
-                  Icons.chat_bubble_outline_rounded,
-                  const NewChatScreen(),
-                ),
-                action(
-                  'New group',
-                  'Bring people together',
-                  Icons.group_outlined,
-                  const NewGroupScreen(),
-                ),
-                action(
-                  'New channel',
-                  'Share updates with subscribers',
-                  Icons.campaign_outlined,
-                  const NewChannelScreen(),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+    final wrapped = GroupScope.wrap(context, screen);
+    Navigator.push(context, MaterialPageRoute<void>(builder: (_) => wrapped));
   }
-
-  Widget _drawerItem(
-    ColorScheme colors, {
-    required String title,
-    required IconData icon,
-    required VoidCallback onTap,
-    bool selected = false,
-  }) => Padding(
-    // Split the 16 px inset between the background and its content.
-    padding: const EdgeInsets.symmetric(
-      horizontal: _HomeDrawerLayout.horizontalPadding / 2,
-    ),
-    child: SizedBox(
-      height: _HomeDrawerLayout.itemHeight,
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: _HomeDrawerLayout.horizontalPadding / 2,
-        ),
-        minLeadingWidth: _HomeDrawerLayout.iconSize,
-        horizontalTitleGap: _HomeDrawerLayout.horizontalPadding,
-        minTileHeight: _HomeDrawerLayout.itemHeight,
-        minVerticalPadding: 0,
-        visualDensity: VisualDensity.standard,
-        titleAlignment: ListTileTitleAlignment.center,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(_HomeDrawerLayout.selectedRadius),
-        ),
-        selected: selected,
-        selectedTileColor: colors.primaryContainer,
-        selectedColor: colors.onPrimaryContainer,
-        iconColor: colors.onSurfaceVariant,
-        textColor: colors.onSurface,
-        leading: Icon(icon, size: _HomeDrawerLayout.iconSize),
-        title: Text(
-          title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-          ),
-        ),
-        onTap: onTap,
-      ),
-    ),
-  );
-
-  Widget _drawer(ColorScheme colors) => Drawer(
-    width: _HomeDrawerLayout.width,
-    child: ListView(
-      padding: const EdgeInsets.only(bottom: 16),
-      children: [
-        ColoredBox(
-          color: colors.primary,
-          child: SafeArea(
-            bottom: false,
-            child: SizedBox(
-              height: _HomeDrawerLayout.headerHeight,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: _HomeDrawerLayout.horizontalPadding,
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    CircleAvatar(
-                      radius: _HomeDrawerLayout.avatarSize / 2,
-                      backgroundColor: colors.primaryContainer,
-                      child: Icon(
-                        Icons.person,
-                        size: 44,
-                        color: colors.onPrimaryContainer,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      widget.userName,
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 19,
-                        height: 1.2,
-                        fontWeight: FontWeight.w600,
-                        color: colors.onPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      widget.phone,
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 15,
-                        height: 1.2,
-                        color: colors.onPrimaryMuted,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: _HomeDrawerLayout.headerGap),
-        _drawerItem(
-          colors,
-          title: 'Chats',
-          icon: Icons.chat_bubble_outline_rounded,
-          selected: true,
-          onTap: () => Navigator.pop(context),
-        ),
-        _drawerItem(
-          colors,
-          title: 'Contacts',
-          icon: Icons.person_outline,
-          onTap: () {
-            Navigator.pop(context);
-            widget.onSectionSelected(MainSection.contacts);
-          },
-        ),
-        _drawerItem(
-          colors,
-          title: 'Saved Messages',
-          icon: Icons.bookmark_border,
-          onTap: () => _open(
-            const ChatScreen(chatId: 'saved', chatName: 'Saved Messages'),
-            fromDrawer: true,
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Divider(
-            height: 1,
-            thickness: 1,
-            indent: _HomeDrawerLayout.horizontalPadding,
-            endIndent: _HomeDrawerLayout.horizontalPadding,
-            color: colors.subtleDivider,
-          ),
-        ),
-        _drawerItem(
-          colors,
-          title: 'Settings',
-          icon: Icons.settings_outlined,
-          onTap: () {
-            Navigator.pop(context);
-            widget.onSectionSelected(MainSection.settings);
-          },
-        ),
-      ],
-    ),
-  );
 
   @override
   Widget build(BuildContext context) {
     final colors = AppTheme.colorsOf(context);
     final query = _searchController.text.trim().toLowerCase();
-    final chats = _chats
+    final localChats = (_groups?.groups ?? []).reversed.map((group) {
+      final last = group.messages.isEmpty ? null : group.messages.last;
+      return DemoChat(
+        group.id,
+        group.name,
+        last == null
+            ? '${group.members.length} members'
+            : last.text.isNotEmpty
+            ? last.text
+            : last.media.map((m) => m.name).join(', '),
+        last == null ? '' : TimeOfDay.fromDateTime(last.sentAt).format(context),
+        group.name.characters.first.toUpperCase(),
+        AppTheme.avatarBlue,
+        group: true,
+      );
+    });
+    final chats = [...localChats, ...demoChats]
         .where(
           (chat) =>
               chat.name.toLowerCase().contains(query) ||
@@ -373,77 +90,17 @@ class _HomeScreenState extends State<HomeScreen> {
         .toList();
     return Scaffold(
       backgroundColor: colors.surface,
-      appBar: AppBar(
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        titleSpacing: 8,
-        automaticallyImplyLeading: !_isSearching,
-        title: _isSearching
-            ? SizedBox(
-                height: 42,
-                child: TextField(
-                  controller: _searchController,
-                  autofocus: true,
-                  cursorColor: colors.onPrimary,
-                  textAlignVertical: TextAlignVertical.center,
-                  textInputAction: TextInputAction.search,
-                  style: TextStyle(color: colors.onPrimary, fontSize: 16),
-                  decoration: InputDecoration(
-                    hintText: 'Search chats',
-                    hintStyle: TextStyle(color: colors.onPrimaryMuted),
-                    prefixIcon: Icon(
-                      Icons.search_rounded,
-                      size: 21,
-                      color: colors.onPrimarySubtle,
-                    ),
-                    suffixIcon: IconButton(
-                      tooltip: 'Close search',
-                      icon: Icon(
-                        Icons.close_rounded,
-                        color: colors.onPrimary,
-                        size: 21,
-                      ),
-                      onPressed: () {
-                        FocusScope.of(context).unfocus();
-                        setState(() {
-                          _searchController.clear();
-                          _isSearching = false;
-                        });
-                      },
-                    ),
-                    filled: true,
-                    fillColor: colors.searchFill,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
-                      borderSide: BorderSide.none,
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
-                      borderSide: BorderSide.none,
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
-                      borderSide: BorderSide(color: colors.searchOutline),
-                    ),
-                  ),
-                  onChanged: (_) => setState(() {}),
-                ),
-              )
-            : const Text(
-                'Chats',
-                style: TextStyle(fontSize: 21, fontWeight: FontWeight.w600),
-              ),
-        actions: [
-          if (!_isSearching)
-            IconButton(
-              tooltip: 'Search',
-              icon: const Icon(Icons.search),
-              onPressed: () => setState(() => _isSearching = true),
-            ),
-        ],
+      appBar: SearchAppBar(
+        title: 'Chats',
+        hintText: 'Search chats',
+        controller: _searchController,
+        titleStyle: const TextStyle(fontSize: 21, fontWeight: FontWeight.w600),
+        onChanged: (_) => setState(() {}),
       ),
-      drawer: _drawer(colors),
+      drawer: AppDrawer(
+        selectedSection: MainSection.chats,
+        onSectionSelected: widget.onSectionSelected,
+      ),
       body: SafeArea(
         top: false,
         child: chats.isEmpty
@@ -486,28 +143,38 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: colors.primary,
         foregroundColor: colors.onPrimary,
         elevation: 2,
-        onPressed: () => _showCreatePanel(context),
+        onPressed: () => _open(const NewChatScreen()),
         child: const Icon(Icons.edit, size: 25),
       ),
     );
   }
 
-  Widget _tile(BuildContext context, _Chat chat) {
+  Widget _tile(BuildContext context, DemoChat chat) {
     final colors = AppTheme.colorsOf(context);
+    final group = _groups?.find(chat.id);
     final secondary = colors.onSurfaceVariant;
     return Material(
       color: colors.surface,
       child: InkWell(
-        onTap: () => _open(ChatScreen(chatId: chat.id, chatName: chat.name)),
+        onTap: () => _open(
+          group == null
+              ? ChatScreen(chatId: chat.id, chatName: chat.name)
+              : GroupChatScreen(store: _groups!, groupId: group.id),
+        ),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           child: Row(
             children: [
               CircleAvatar(
+                backgroundImage: group?.photo == null
+                    ? null
+                    : MemoryImage(group!.photo!),
                 radius: 26,
                 backgroundColor: chat.color,
                 foregroundColor: AppTheme.avatarForeground,
-                child: chat.id == 'saved'
+                child: group?.photo != null
+                    ? null
+                    : chat.id == 'saved'
                     ? const Icon(Icons.bookmark_border, size: 30)
                     : Text(
                         chat.initials,
@@ -628,31 +295,4 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-}
-
-class _Chat {
-  const _Chat(
-    this.id,
-    this.name,
-    this.message,
-    this.time,
-    this.initials,
-    this.color, {
-    this.unread = 0,
-    this.pinned = false,
-    this.muted = false,
-    this.group = false,
-    this.sent = false,
-  });
-  final String id;
-  final String name;
-  final String message;
-  final String time;
-  final String initials;
-  final Color color;
-  final int unread;
-  final bool pinned;
-  final bool muted;
-  final bool group;
-  final bool sent;
 }

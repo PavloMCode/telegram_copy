@@ -111,11 +111,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         _confirmation.clear();
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute<void>(
-            builder: (_) => MainScreen(
-              userName: profile.name,
-              phone: profile.phone,
-              authApi: _auth,
-            ),
+            builder: (_) => MainScreen(profile: profile, authApi: _auth),
           ),
           (_) => false,
         );

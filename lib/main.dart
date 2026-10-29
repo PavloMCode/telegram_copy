@@ -26,19 +26,18 @@ class TelegramApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Telegram Clone',
-      theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
-      themeMode: AppTheme.mode,
-      home: initialProfile == null
-          ? RegistrationScreen(authApi: authApi)
-          : MainScreen(
-              userName: initialProfile!.name,
-              phone: initialProfile!.phone,
-              authApi: authApi,
-            ),
-      debugShowCheckedModeBanner: false,
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: AppTheme.selectedMode,
+      builder: (context, mode, _) => MaterialApp(
+        title: 'Telegram Clone',
+        theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        themeMode: mode,
+        home: initialProfile == null
+            ? RegistrationScreen(authApi: authApi)
+            : MainScreen(profile: initialProfile, authApi: authApi),
+        debugShowCheckedModeBanner: false,
+      ),
     );
   }
 }

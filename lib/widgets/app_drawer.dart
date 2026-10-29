@@ -2,11 +2,10 @@ import 'package:flutter/material.dart';
 import '../navigation/main_section.dart';
 import '../screens/chat_screen.dart';
 import '../theme/app_theme.dart';
+import 'drawer_profile_header.dart';
 
 abstract final class _DrawerLayout {
   static const width = 280.0;
-  static const headerHeight = 160.0;
-  static const avatarSize = 72.0;
   static const itemHeight = 52.0;
   static const iconSize = 22.0;
   static const horizontalPadding = 16.0;
@@ -94,60 +93,7 @@ class AppDrawer extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.only(bottom: 16),
         children: [
-          ColoredBox(
-            color: colors.primary,
-            child: SafeArea(
-              bottom: false,
-              child: SizedBox(
-                height: _DrawerLayout.headerHeight,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: _DrawerLayout.horizontalPadding,
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      CircleAvatar(
-                        radius: _DrawerLayout.avatarSize / 2,
-                        backgroundColor: colors.primaryContainer,
-                        child: Icon(
-                          Icons.person,
-                          size: 44,
-                          color: colors.onPrimaryContainer,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'My Name',
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 19,
-                          height: 1.2,
-                          fontWeight: FontWeight.w600,
-                          color: colors.onPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '+380 99 123 45 67',
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 15,
-                          height: 1.2,
-                          color: colors.onPrimaryMuted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
+          const DrawerProfileHeader(),
           const SizedBox(height: _DrawerLayout.headerGap),
           _drawerItem(
             colors,

@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import '../navigation/main_section.dart';
 import '../theme/app_theme.dart';
+import '../data/demo_data.dart';
 import '../widgets/app_drawer.dart';
+import '../widgets/search_app_bar.dart';
 import 'contact_account_screen.dart';
+import '../widgets/group_scope.dart';
+import '../widgets/contact_call_dialog.dart';
 
 class ContactsScreen extends StatefulWidget {
   const ContactsScreen({super.key, required this.onSectionSelected});
@@ -15,13 +19,6 @@ class ContactsScreen extends StatefulWidget {
 
 class _ContactsScreenState extends State<ContactsScreen> {
   final _searchController = TextEditingController();
-  bool _isSearching = false;
-
-  // Placeholder contacts until the address book is connected.
-  static final _contacts = List.generate(
-    5,
-    (_) => (name: 'Name Surname', phone: '+1234567890'),
-  );
 
   @override
   void dispose() {
@@ -33,7 +30,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
   Widget build(BuildContext context) {
     final colors = AppTheme.colorsOf(context);
     final query = _searchController.text.trim().toLowerCase();
-    final contacts = _contacts
+    final contacts = DemoContacts.all
         .where(
           (contact) =>
               contact.name.toLowerCase().contains(query) ||
@@ -41,69 +38,11 @@ class _ContactsScreenState extends State<ContactsScreen> {
         )
         .toList();
     return Scaffold(
-      appBar: AppBar(
-        titleSpacing: 8,
-        title: _isSearching
-            ? SizedBox(
-                height: 42,
-                child: TextField(
-                  controller: _searchController,
-                  autofocus: true,
-                  onChanged: (_) => setState(() {}),
-                  cursorColor: colors.onPrimary,
-                  style: TextStyle(color: colors.onPrimary, fontSize: 16),
-                  textAlignVertical: TextAlignVertical.center,
-                  textInputAction: TextInputAction.search,
-                  decoration: InputDecoration(
-                    hintText: 'Search contacts',
-                    hintStyle: TextStyle(color: colors.onPrimaryMuted),
-                    prefixIcon: Icon(
-                      Icons.search_rounded,
-                      color: colors.onPrimarySubtle,
-                      size: 21,
-                    ),
-                    suffixIcon: IconButton(
-                      tooltip: 'Close search',
-                      icon: Icon(
-                        Icons.close_rounded,
-                        color: colors.onPrimary,
-                        size: 21,
-                      ),
-                      onPressed: () {
-                        FocusScope.of(context).unfocus();
-                        setState(() {
-                          _searchController.clear();
-                          _isSearching = false;
-                        });
-                      },
-                    ),
-                    filled: true,
-                    fillColor: colors.searchFill,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
-                      borderSide: BorderSide.none,
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
-                      borderSide: BorderSide.none,
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
-                      borderSide: BorderSide(color: colors.searchOutline),
-                    ),
-                  ),
-                ),
-              )
-            : const Text('Contacts'),
-        actions: [
-          if (!_isSearching)
-            IconButton(
-              tooltip: 'Search',
-              icon: const Icon(Icons.search),
-              onPressed: () => setState(() => _isSearching = true),
-            ),
-        ],
+      appBar: SearchAppBar(
+        title: 'Contacts',
+        hintText: 'Search contacts',
+        controller: _searchController,
+        onChanged: (_) => setState(() {}),
       ),
       drawer: AppDrawer(
         selectedSection: MainSection.contacts,
@@ -140,10 +79,12 @@ class _ContactsScreenState extends State<ContactsScreen> {
                         leading: CircleAvatar(
                           radius: 26,
                           backgroundColor: colors.primaryContainer,
-                          child: Icon(
-                            Icons.person,
-                            size: 30,
-                            color: colors.onPrimaryContainer,
+                          child: Text(
+                            contact.name.characters.first.toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 22,
+                              color: colors.onPrimaryContainer,
+                            ),
                           ),
                         ),
                         title: Text(
@@ -158,7 +99,9 @@ class _ContactsScreenState extends State<ContactsScreen> {
                           ),
                         ),
                         trailing: IconButton(
-                          onPressed: () {},
+                          tooltip: 'Call ${contact.name}',
+                          onPressed: () =>
+                              showContactCallDialog(context, contact.name),
                           icon: Icon(
                             Icons.phone_outlined,
                             color: colors.primary,
@@ -168,8 +111,10 @@ class _ContactsScreenState extends State<ContactsScreen> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) =>
-                                  const ContactAccountScreen(),
+                              builder: (_) => GroupScope.wrap(
+                                context,
+                                ContactAccountScreen(contact: contact),
+                              ),
                             ),
                           );
                         },
@@ -259,37 +204,6 @@ class _ContactsScreenState extends State<ContactsScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  void _showChatBlockDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        final colors = AppTheme.colorsOf(context);
-        return AlertDialog(
-          title: const Text("Are you sure?"),
-          content: const Text("You will block this user"),
-          actions: [
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: colors.primary,
-                foregroundColor: colors.onPrimary,
-              ),
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Cancel"),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: colors.error,
-                foregroundColor: colors.onError,
-              ),
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Block"),
-            ),
-          ],
-        );
-      },
     );
   }
 }

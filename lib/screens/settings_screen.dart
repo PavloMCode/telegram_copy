@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../navigation/main_section.dart';
 import '../services/auth_api.dart';
+import '../widgets/profile_scope.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/settings_row.dart';
@@ -48,6 +49,7 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = AppTheme.colorsOf(context);
+    final profile = ProfileScope.of(context);
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       drawer: AppDrawer(
@@ -65,7 +67,10 @@ class SettingsScreen extends StatelessWidget {
             () => Navigator.push(
               context,
               MaterialPageRoute<void>(
-                builder: (_) => SettingsScreenAccount(authApi: authApi),
+                builder: (_) => ProfileScope(
+                  profile: profile,
+                  child: SettingsScreenAccount(authApi: authApi),
+                ),
               ),
             ),
           ),

@@ -1,24 +1,22 @@
 import 'dart:typed_data';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import '../data/demo_data.dart';
+import '../services/profile_photo_picker.dart';
 import 'chat_screen.dart';
-
-// These contacts match the demo conversations on the home screen.
-const _contacts = [
-  (id: 'anna', name: 'Anna', status: 'last seen recently'),
-  (id: 'maksym', name: 'Maksym', status: 'last seen recently'),
-  (id: 'olena', name: 'Olena', status: 'last seen recently'),
-  (id: 'andrii', name: 'Andrii', status: 'last seen recently'),
-];
+import 'group_chat_screen.dart';
+import '../widgets/group_scope.dart';
+import '../services/local_group_store.dart';
 
 void _openConversation(BuildContext context, String id, String name) {
+  final store = GroupScope.maybeOf(context);
+  final screen = store?.find(id) == null
+      ? ChatScreen(chatId: id, chatName: name)
+      : GroupChatScreen(store: store!, groupId: id);
   Navigator.of(context).pushAndRemoveUntil(
-    MaterialPageRoute<void>(
-      builder: (_) => ChatScreen(chatId: id, chatName: name),
-    ),
+    MaterialPageRoute<void>(builder: (_) => screen),
     (route) => route.isFirst,
   );
 }
@@ -60,7 +58,7 @@ class _ContactPickerState extends State<_ContactPicker> {
   Widget build(BuildContext context) {
     final colors = AppTheme.colorsOf(context);
     final query = _search.text.trim().toLowerCase();
-    final contacts = _contacts
+    final contacts = DemoContacts.all
         .where((contact) => contact.name.toLowerCase().contains(query))
         .toList();
     return Scaffold(
@@ -109,7 +107,7 @@ class _ContactPickerState extends State<_ContactPicker> {
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   children: [
-                    for (final contact in _contacts)
+                    for (final contact in DemoContacts.all)
                       if (_selected.contains(contact.id))
                         Padding(
                           padding: const EdgeInsets.only(right: 8),
@@ -136,7 +134,8 @@ class _ContactPickerState extends State<_ContactPicker> {
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute<void>(
-                          builder: (_) => const NewGroupScreen(),
+                          builder: (_) =>
+                              GroupScope.wrap(context, const NewGroupScreen()),
                         ),
                       ),
                     ),
@@ -221,8 +220,10 @@ class _ContactPickerState extends State<_ContactPicker> {
                       Navigator.push(
                         context,
                         MaterialPageRoute<void>(
-                          builder: (_) =>
-                              _ConversationDetails(members: List.of(_selected)),
+                          builder: (_) => GroupScope.wrap(
+                            context,
+                            _ConversationDetails(members: List.of(_selected)),
+                          ),
                         ),
                       );
                     },
@@ -263,6 +264,7 @@ class _ConversationDetailsState extends State<_ConversationDetails> {
   final _description = TextEditingController();
   Uint8List? _photo;
   bool _picking = false;
+  bool _saving = false;
 
   @override
   void dispose() {
@@ -275,12 +277,8 @@ class _ConversationDetailsState extends State<_ConversationDetails> {
     if (_picking) return;
     setState(() => _picking = true);
     try {
-      final file = await FilePicker.pickFile(type: FileType.image);
-      if (file == null) return;
-      final bytes = await file.readAsBytes();
-      final image = await decodeImageFromList(bytes);
-      image.dispose();
-      if (mounted) setState(() => _photo = bytes);
+      final bytes = await pickProfilePhoto();
+      if (mounted && bytes != null) setState(() => _photo = bytes);
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -294,7 +292,8 @@ class _ConversationDetailsState extends State<_ConversationDetails> {
     }
   }
 
-  void _next() {
+  Future<void> _next() async {
+    if (_saving || _picking) return;
     if (!_form.currentState!.validate()) return;
     if (widget.channel) {
       Navigator.push(
@@ -304,11 +303,32 @@ class _ConversationDetailsState extends State<_ConversationDetails> {
         ),
       );
     } else {
-      _openConversation(
-        context,
-        'local-group-${DateTime.now().microsecondsSinceEpoch}',
-        _name.text.trim(),
-      );
+      final store = GroupScope.maybeOf(context);
+      if (store == null) return;
+      setState(() => _saving = true);
+      try {
+        final id = await store.create(
+          name: _name.text,
+          description: _description.text,
+          memberIds: widget.members,
+          photo: _photo,
+        );
+        if (mounted) _openConversation(context, id, _name.text.trim());
+      } catch (error) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                error is GroupException
+                    ? error.message
+                    : 'Could not create the group. Please try again.',
+              ),
+            ),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _saving = false);
+      }
     }
   }
 
@@ -387,7 +407,7 @@ class _ConversationDetailsState extends State<_ConversationDetails> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                for (final contact in _contacts)
+                for (final contact in DemoContacts.all)
                   if (widget.members.contains(contact.id))
                     ListTile(
                       contentPadding: EdgeInsets.zero,
@@ -400,7 +420,9 @@ class _ConversationDetailsState extends State<_ConversationDetails> {
               ],
               const SizedBox(height: 24),
               Text(
-                'Demo mode · This conversation opens locally. Details are not saved to a server.',
+                widget.channel
+                    ? 'Demo mode · This conversation opens locally.'
+                    : 'Your group, messages and media are saved on this device.',
                 style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
               ),
             ],
@@ -409,7 +431,7 @@ class _ConversationDetailsState extends State<_ConversationDetails> {
       ),
       floatingActionButton: FloatingActionButton(
         tooltip: widget.channel ? 'Next' : 'Create group',
-        onPressed: _picking ? null : _next,
+        onPressed: _picking || _saving ? null : _next,
         child: Icon(widget.channel ? Icons.arrow_forward : Icons.check),
       ),
     );
@@ -428,15 +450,10 @@ class _ChannelTypeScreen extends StatefulWidget {
 }
 
 class _ChannelTypeScreenState extends State<_ChannelTypeScreen> {
-  final _form = GlobalKey<FormState>();
-  final _link = TextEditingController();
+  late final String _channelId =
+      'local-channel-${DateTime.now().microsecondsSinceEpoch}';
+  late final String _publicLink = 'https://example.invalid/channel/$_channelId';
   _ChannelType _type = _ChannelType.public;
-
-  @override
-  void dispose() {
-    _link.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -444,87 +461,65 @@ class _ChannelTypeScreenState extends State<_ChannelTypeScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Channel type')),
       body: SafeArea(
-        child: Form(
-          key: _form,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 100),
-            children: [
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 100),
+          children: [
+            Text(
+              'Channel type',
+              style: TextStyle(
+                color: colors.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 12),
+            for (final type in _ChannelType.values)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(
+                  _type == type
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_off,
+                  color: _type == type ? colors.primary : colors.outline,
+                ),
+                title: Text(
+                  type == _ChannelType.public
+                      ? 'Public channel'
+                      : 'Private channel',
+                ),
+                subtitle: Text(
+                  type == _ChannelType.public
+                      ? 'Anyone can find your channel in search and join.'
+                      : 'People can join only if they are added or have an invite link.',
+                ),
+                onTap: () => setState(() => _type = type),
+              ),
+            const Divider(height: 32),
+            if (_type == _ChannelType.public) ...[
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.link, color: colors.primary),
+                title: const Text('Public link'),
+                subtitle: Text(_publicLink),
+              ),
               Text(
-                'Channel type',
-                style: TextStyle(
-                  color: colors.primary,
-                  fontWeight: FontWeight.w600,
+                'A demo link is generated automatically. It does not open a real channel.',
+                style: TextStyle(color: colors.onSurfaceVariant, height: 1.5),
+              ),
+            ] else
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.link, color: colors.primary),
+                title: const Text('Invite link'),
+                subtitle: const Text(
+                  'An invite link will be available when the server is connected.',
                 ),
               ),
-              const SizedBox(height: 12),
-              for (final type in _ChannelType.values)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(
-                    _type == type
-                        ? Icons.radio_button_checked
-                        : Icons.radio_button_off,
-                    color: _type == type ? colors.primary : colors.outline,
-                  ),
-                  title: Text(
-                    type == _ChannelType.public
-                        ? 'Public channel'
-                        : 'Private channel',
-                  ),
-                  subtitle: Text(
-                    type == _ChannelType.public
-                        ? 'Anyone can find your channel in search and join.'
-                        : 'People can join only if they are added or have an invite link.',
-                  ),
-                  onTap: () => setState(() => _type = type),
-                ),
-              const Divider(height: 32),
-              if (_type == _ChannelType.public) ...[
-                TextFormField(
-                  controller: _link,
-                  maxLength: 32,
-                  autocorrect: false,
-                  enableSuggestions: false,
-                  decoration: const InputDecoration(
-                    labelText: 'Public link',
-                    prefixText: 't.me/',
-                  ),
-                  validator: (value) =>
-                      RegExp(
-                        r'^[a-zA-Z][a-zA-Z0-9_]{4,31}$',
-                      ).hasMatch(value?.trim() ?? '')
-                      ? null
-                      : 'Use 5–32 letters, numbers or underscores. Start with a letter.',
-                ),
-                Text(
-                  'This is a preview. Link availability is not checked and the address is not reserved.',
-                  style: TextStyle(color: colors.onSurfaceVariant, height: 1.5),
-                ),
-              ] else
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.link, color: colors.primary),
-                  title: const Text('Invite link'),
-                  subtitle: const Text(
-                    'An invite link will be available when the server is connected.',
-                  ),
-                ),
-            ],
-          ),
+          ],
         ),
       ),
       floatingActionButton: FloatingActionButton(
         tooltip: 'Create channel',
-        onPressed: () {
-          if (_type == _ChannelType.public && !_form.currentState!.validate()) {
-            return;
-          }
-          _openConversation(
-            context,
-            'local-channel-${DateTime.now().microsecondsSinceEpoch}',
-            widget.name,
-          );
-        },
+        onPressed: () => _openConversation(context, _channelId, widget.name),
         child: const Icon(Icons.check),
       ),
     );

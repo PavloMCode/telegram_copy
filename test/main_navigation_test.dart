@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:telegram_frontend/main.dart';
+import 'package:telegram_frontend/services/auth_api.dart';
 import 'package:telegram_frontend/navigation/main_section.dart';
 import 'package:telegram_frontend/screens/chat_screen.dart';
 import 'package:telegram_frontend/screens/contact_account_screen.dart';
@@ -45,7 +46,9 @@ void main() {
   testWidgets('Main sections share a drawer without adding routes', (
     tester,
   ) async {
-    await tester.pumpWidget(const TelegramApp());
+    await tester.pumpWidget(
+      const TelegramApp(initialProfile: AuthProfile('Admin', '+380991234567')),
+    );
     await tester.pumpAndSettle();
     expectMainSection(tester, HomeScreen);
     for (final (title, section, screen) in [
@@ -58,6 +61,9 @@ void main() {
       await selectSection(tester, title);
       expectMainSection(tester, screen);
       await openDrawer(tester);
+      expect(find.text('Admin'), findsOneWidget);
+      expect(find.text('+380991234567'), findsOneWidget);
+      expect(find.text('Log out'), findsNothing);
       expect(
         tester.widget<AppDrawer>(find.byType(AppDrawer)).selectedSection,
         section,
@@ -86,7 +92,9 @@ void main() {
   testWidgets('Saved Messages keeps Back and returns to its source section', (
     tester,
   ) async {
-    await tester.pumpWidget(const TelegramApp());
+    await tester.pumpWidget(
+      const TelegramApp(initialProfile: AuthProfile('Admin', '+380991234567')),
+    );
     await tester.pumpAndSettle();
     for (final (title, screen) in [
       ('Chats', HomeScreen),
@@ -109,7 +117,9 @@ void main() {
   testWidgets('Chats and contact profiles use Back without a drawer', (
     tester,
   ) async {
-    await tester.pumpWidget(const TelegramApp());
+    await tester.pumpWidget(
+      const TelegramApp(initialProfile: AuthProfile('Admin', '+380991234567')),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Anna'));
     await tester.pumpAndSettle();
@@ -118,7 +128,7 @@ void main() {
     await tester.pumpAndSettle();
     expectMainSection(tester, HomeScreen);
     await selectSection(tester, 'Contacts');
-    await tester.tap(find.widgetWithText(ListTile, 'Name Surname').first);
+    await tester.tap(find.widgetWithText(ListTile, 'Anna').first);
     await tester.pumpAndSettle();
     await expectDetail(tester, ContactAccountScreen);
     await tester.pageBack();
@@ -129,12 +139,33 @@ void main() {
   testWidgets('Nested settings return through their own screens', (
     tester,
   ) async {
-    await tester.pumpWidget(const TelegramApp());
+    await tester.pumpWidget(
+      const TelegramApp(initialProfile: AuthProfile('Admin', '+380991234567')),
+    );
     await tester.pumpAndSettle();
     await selectSection(tester, 'Settings');
     await tester.tap(find.widgetWithText(ListTile, 'Account'));
     await tester.pumpAndSettle();
     await expectDetail(tester, SettingsScreenAccount);
+    final nameField = find.byWidgetPredicate(
+      (widget) => widget is TextFormField && widget.initialValue == 'Admin',
+    );
+    final phoneField = find.byWidgetPredicate(
+      (widget) =>
+          widget is TextFormField && widget.initialValue == '+380991234567',
+    );
+    expect(nameField, findsOneWidget);
+    await tester.scrollUntilVisible(
+      phoneField,
+      150,
+      scrollable: find
+          .descendant(
+            of: find.byType(ListView),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    expect(phoneField, findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();
     expectMainSection(tester, SettingsScreen);
@@ -152,34 +183,36 @@ void main() {
     expectMainSection(tester, SettingsScreen);
   });
 
-  testWidgets(
-    'Switching sections preserves search and the menu remains usable',
-    (tester) async {
-      await tester.pumpWidget(const TelegramApp());
-      await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Search'));
-      await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField), 'Anna');
-      await tester.pumpAndSettle();
-      await selectSection(tester, 'Contacts');
-      await tester.tap(find.byTooltip('Search'));
-      await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField), 'Surname');
-      await tester.pumpAndSettle();
-      await selectSection(tester, 'Chats');
-      expectMainSection(tester, HomeScreen);
-      expect(
-        tester.widget<TextField>(find.byType(TextField)).controller!.text,
-        'Anna',
-      );
-      expect(find.text('Study Group'), findsNothing);
-      await selectSection(tester, 'Contacts');
-      expectMainSection(tester, ContactsScreen);
-      expect(
-        tester.widget<TextField>(find.byType(TextField)).controller!.text,
-        'Surname',
-      );
-      expect(tester.takeException(), isNull);
-    },
-  );
+  testWidgets('Search closes on focus loss and outside buttons remain usable', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const TelegramApp(initialProfile: AuthProfile('Admin', '+380991234567')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Search'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Anna');
+    await tester.pumpAndSettle();
+    await selectSection(tester, 'Contacts');
+    await tester.tap(find.byTooltip('Search'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Maksym');
+    await tester.pumpAndSettle();
+    await selectSection(tester, 'Chats');
+    expectMainSection(tester, HomeScreen);
+    expect(find.byType(TextField), findsNothing);
+    expect(find.text('Study Group'), findsOneWidget);
+    await selectSection(tester, 'Contacts');
+    expectMainSection(tester, ContactsScreen);
+    expect(find.byType(TextField), findsNothing);
+    await tester.tap(find.byTooltip('Search'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Anna');
+    await tester.tap(find.byTooltip('Contact actions'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TextField), findsNothing);
+    expect(find.text('Add contact'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

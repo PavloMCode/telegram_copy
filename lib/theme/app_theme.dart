@@ -26,6 +26,7 @@ abstract final class AppTheme {
 
   /// system — тема устройства; light / dark — фиксированная тема.
   static const ThemeMode mode = ThemeMode.system;
+  static final selectedMode = ValueNotifier<ThemeMode>(mode);
 
   static final ThemeData light = _build(Brightness.light);
   static final ThemeData dark = _build(Brightness.dark);
