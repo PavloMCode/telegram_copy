@@ -1,9 +1,23 @@
+import '../widgets/gradient_surfaces.dart';
 import 'package:flutter/material.dart';
+import '../navigation/main_section.dart';
 import '../theme/app_theme.dart';
+import '../data/demo_data.dart';
+import '../widgets/app_drawer.dart';
+import '../widgets/search_app_bar.dart';
 import 'contact_account_screen.dart';
+import '../widgets/group_scope.dart';
+import '../widgets/contact_call_dialog.dart';
+import '../widgets/contact_scope.dart';
+import '../widgets/account_data_scope.dart';
+import '../widgets/local_contact_editor.dart';
+import '../widgets/contact_actions.dart';
+import '../widgets/confirmation_dialog.dart';
 
 class ContactsScreen extends StatefulWidget {
-  const ContactsScreen({super.key});
+  const ContactsScreen({super.key, required this.onSectionSelected});
+
+  final ValueChanged<MainSection> onSectionSelected;
 
   @override
   State<ContactsScreen> createState() => _ContactsScreenState();
@@ -11,13 +25,6 @@ class ContactsScreen extends StatefulWidget {
 
 class _ContactsScreenState extends State<ContactsScreen> {
   final _searchController = TextEditingController();
-  bool _isSearching = false;
-
-  // Placeholder contacts until the address book is connected.
-  static final _contacts = List.generate(
-    5,
-    (_) => (name: 'Name Surname', phone: '+1234567890'),
-  );
 
   @override
   void dispose() {
@@ -27,97 +34,30 @@ class _ContactsScreenState extends State<ContactsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final brightness = switch (AppTheme.mode) {
-      ThemeMode.light => Brightness.light,
-      ThemeMode.dark => Brightness.dark,
-      ThemeMode.system => MediaQuery.platformBrightnessOf(context),
-    };
-    return Theme(
-      data: brightness == Brightness.dark ? AppTheme.dark : AppTheme.light,
-      child: Builder(builder: _buildContacts),
-    );
-  }
-
-  Widget _buildContacts(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final colors = AppTheme.colorsOf(context);
+    final contactStore = ContactScope.maybeOf(context);
     final query = _searchController.text.trim().toLowerCase();
-    final contacts = _contacts
-        .where(
-          (contact) =>
-              contact.name.toLowerCase().contains(query) ||
-              contact.phone.contains(query),
-        )
-        .toList();
-    return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: !_isSearching,
-        titleSpacing: 8,
-        title: _isSearching
-            ? SizedBox(
-                height: 42,
-                child: TextField(
-                  controller: _searchController,
-                  autofocus: true,
-                  onChanged: (_) => setState(() {}),
-                  cursorColor: colors.onPrimary,
-                  style: TextStyle(color: colors.onPrimary, fontSize: 16),
-                  textAlignVertical: TextAlignVertical.center,
-                  textInputAction: TextInputAction.search,
-                  decoration: InputDecoration(
-                    hintText: 'Search contacts',
-                    hintStyle: TextStyle(
-                      color: colors.onPrimary.withValues(alpha: 0.7),
-                    ),
-                    prefixIcon: Icon(
-                      Icons.search_rounded,
-                      color: colors.onPrimary.withValues(alpha: 0.8),
-                      size: 21,
-                    ),
-                    suffixIcon: IconButton(
-                      tooltip: 'Close search',
-                      icon: Icon(
-                        Icons.close_rounded,
-                        color: colors.onPrimary,
-                        size: 21,
-                      ),
-                      onPressed: () {
-                        FocusScope.of(context).unfocus();
-                        setState(() {
-                          _searchController.clear();
-                          _isSearching = false;
-                        });
-                      },
-                    ),
-                    filled: true,
-                    fillColor: colors.onPrimary.withValues(alpha: 0.12),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
-                      borderSide: BorderSide.none,
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
-                      borderSide: BorderSide.none,
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
-                      borderSide: BorderSide(
-                        color: colors.onPrimary.withValues(alpha: 0.4),
-                      ),
-                    ),
-                  ),
-                ),
-              )
-            : const Text('Contacts'),
-        actions: [
-          if (!_isSearching)
-            IconButton(
-              tooltip: 'Search',
-              icon: const Icon(Icons.search),
-              onPressed: () => setState(() => _isSearching = true),
-            ),
-        ],
+    final contacts =
+        (AccountDataScope.maybeOf(context)?.contacts ?? DemoContacts.all)
+            .where(
+              (contact) =>
+                  contact.name.toLowerCase().contains(query) ||
+                  contact.phone.contains(query),
+            )
+            .toList();
+    return AppScaffold(
+      appBar: SearchAppBar(
+        title: 'Contacts',
+        hintText: 'Search contacts',
+        controller: _searchController,
+        onChanged: (_) => setState(() {}),
       ),
+      drawer: MediaQuery.sizeOf(context).width >= 840
+          ? null
+          : AppDrawer(
+              selectedSection: MainSection.contacts,
+              onSectionSelected: widget.onSectionSelected,
+            ),
       body: Column(
         children: [
           Expanded(
@@ -136,7 +76,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
                       thickness: 0.5,
                       indent: 84,
                       endIndent: 16,
-                      color: colors.outlineVariant.withValues(alpha: 0.5),
+                      color: colors.subtleDivider,
                     ),
                     itemBuilder: (context, index) {
                       final contact = contacts[index];
@@ -149,10 +89,12 @@ class _ContactsScreenState extends State<ContactsScreen> {
                         leading: CircleAvatar(
                           radius: 26,
                           backgroundColor: colors.primaryContainer,
-                          child: Icon(
-                            Icons.person,
-                            size: 30,
-                            color: colors.onPrimaryContainer,
+                          child: Text(
+                            contact.name.characters.first.toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 22,
+                              color: colors.onPrimaryContainer,
+                            ),
                           ),
                         ),
                         title: Text(
@@ -163,25 +105,30 @@ class _ContactsScreenState extends State<ContactsScreen> {
                           contact.phone,
                           style: TextStyle(
                             fontSize: 12,
-                            color: colors.onSurfaceVariant.withValues(
-                              alpha: 0.8,
-                            ),
+                            color: colors.secondaryText,
                           ),
                         ),
                         trailing: IconButton(
-                          onPressed: () {},
+                          tooltip: 'Call ${contact.name}',
+                          onPressed: contactStore?.isBlocked(contact.id) == true
+                              ? null
+                              : () => showContactCallDialog(
+                                  context,
+                                  contact.name,
+                                ),
                           icon: Icon(
                             Icons.phone_outlined,
                             color: colors.primary,
                           ),
                         ),
                         onTap: () {
+                          final screen = GroupScope.wrap(
+                            context,
+                            ContactAccountScreen(contact: contact),
+                          );
                           Navigator.push(
                             context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  const ContactAccountScreen(),
-                            ),
+                            MaterialPageRoute(builder: (_) => screen),
                           );
                         },
                       );
@@ -190,7 +137,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: GradientFab(
         tooltip: 'Contact actions',
         onPressed: () => _showContactActions(context),
         child: const Icon(Icons.more_vert),
@@ -200,15 +147,15 @@ class _ContactsScreenState extends State<ContactsScreen> {
 
   void _showContactActions(BuildContext context) {
     FocusScope.of(context).unfocus();
-    showModalBottomSheet<void>(
+    showGradientBottomSheet<void>(
       context: context,
       showDragHandle: true,
-      backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
+      backgroundColor: AppTheme.colorsOf(context).surfaceContainer,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (sheetContext) {
-        final colors = Theme.of(sheetContext).colorScheme;
+        final colors = AppTheme.colorsOf(sheetContext);
         return SafeArea(
           top: false,
           child: Padding(
@@ -219,19 +166,28 @@ class _ContactsScreenState extends State<ContactsScreen> {
                   'Add contact',
                   Icons.person_add_outlined,
                   colors.primary,
-                  () {},
+                  () {
+                    Navigator.pop(sheetContext);
+                    _editContact();
+                  },
                 ),
                 _contactAction(
                   'Remove contact',
                   Icons.person_remove_outlined,
                   colors.onSurfaceVariant,
-                  () {},
+                  () {
+                    Navigator.pop(sheetContext);
+                    _selectContactAction(remove: true);
+                  },
                 ),
                 _contactAction(
                   'Block contact',
                   Icons.person_off_outlined,
                   colors.error,
-                  () {},
+                  () {
+                    Navigator.pop(sheetContext);
+                    _selectContactAction(remove: false);
+                  },
                 ),
               ],
             ),
@@ -239,6 +195,75 @@ class _ContactsScreenState extends State<ContactsScreen> {
         );
       },
     );
+  }
+
+  Future<void> _editContact() async {
+    final store = AccountDataScope.maybeOf(context);
+    if (store == null) return;
+    final contact = await showLocalContactEditor(context);
+    if (!mounted || contact == null) return;
+    try {
+      await store.saveContact(contact);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not save contact.')),
+        );
+      }
+    }
+  }
+
+  Future<void> _selectContactAction({required bool remove}) async {
+    final data = AccountDataScope.maybeOf(context);
+    final contactStore = ContactScope.maybeOf(context);
+    if (data == null) return;
+    final contact = await showGradientBottomSheet<DemoContact>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            for (final contact in data.contacts)
+              ListTile(
+                title: Text(contact.name),
+                subtitle: Text(contact.phone),
+                onTap: () => Navigator.pop(sheetContext, contact),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || contact == null) return;
+    if (!remove) {
+      if (contactStore != null) {
+        await performContactAction(
+          context,
+          contactStore,
+          contact.id,
+          contactStore.isBlocked(contact.id)
+              ? ContactAction.unblock
+              : ContactAction.block,
+        );
+      }
+      return;
+    }
+    final confirmed = await showConfirmationDialog(
+      context,
+      title: 'Remove contact?',
+      message: 'Remove ${contact.name} from your local contacts?',
+      confirmLabel: 'Remove',
+    );
+    if (!mounted || !confirmed) return;
+    try {
+      await data.removeContact(contact.id);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not remove contact.')),
+        );
+      }
+    }
   }
 
   Widget _contactAction(
@@ -270,37 +295,6 @@ class _ContactsScreenState extends State<ContactsScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  void _showChatBlockDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        final colors = Theme.of(context).colorScheme;
-        return AlertDialog(
-          title: const Text("Are you sure?"),
-          content: const Text("You will block this user"),
-          actions: [
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: colors.primary,
-                foregroundColor: colors.onPrimary,
-              ),
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Cancel"),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: colors.error,
-                foregroundColor: colors.onError,
-              ),
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Block"),
-            ),
-          ],
-        );
-      },
     );
   }
 }

@@ -1,129 +1,107 @@
+import '../widgets/gradient_surfaces.dart';
 import 'package:flutter/material.dart';
+import '../navigation/main_section.dart';
+import '../services/auth_api.dart';
+import '../widgets/group_scope.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_drawer.dart';
+import '../widgets/settings_row.dart';
 import 'settings_screen_account.dart';
 import 'settings_screen_notifications.dart';
+import 'settings_screen_privacy.dart';
+import 'settings_screen_security.dart';
 
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key});
+  const SettingsScreen({
+    super.key,
+    required this.onSectionSelected,
+    this.authApi,
+  });
+  final AuthApi? authApi;
+  final ValueChanged<MainSection> onSectionSelected;
 
   @override
   Widget build(BuildContext context) {
-    final brightness = switch (AppTheme.mode) {
-      ThemeMode.light => Brightness.light,
-      ThemeMode.dark => Brightness.dark,
-      ThemeMode.system => MediaQuery.platformBrightnessOf(context),
-    };
-    return Theme(
-      data: brightness == Brightness.dark ? AppTheme.dark : AppTheme.light,
-      child: Builder(builder: _buildSettings),
+    final colors = AppTheme.colorsOf(context);
+    void open(Widget screen) => Navigator.push(
+      context,
+      MaterialPageRoute<void>(builder: (_) => GroupScope.wrap(context, screen)),
     );
-  }
-
-  Widget _sectionTitle(String title, ColorScheme colors) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-      child: Text(
-        title,
-        style: TextStyle(
-          color: colors.primary,
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-
-  Widget _divider(ColorScheme colors, {double indent = 20}) {
-    return Divider(
-      height: 16,
-      thickness: 0.5,
-      indent: indent,
-      endIndent: 20,
-      color: colors.outlineVariant.withValues(alpha: 0.5),
-    );
-  }
-
-  Widget _settingTile(
-    ColorScheme colors,
-    IconData icon,
-    String title,
-    String subtitle,
-    VoidCallback onTap,
-  ) {
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      horizontalTitleGap: 16,
-      leading: CircleAvatar(
-        backgroundColor: colors.primaryContainer,
-        child: Icon(icon, color: colors.onPrimaryContainer),
-      ),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
-      subtitle: Padding(
-        padding: const EdgeInsets.only(top: 4),
-        child: Text(
-          subtitle,
-          style: TextStyle(
-            fontSize: 13,
-            color: colors.onSurfaceVariant.withValues(alpha: 0.8),
-            height: 1.4,
-          ),
-        ),
-      ),
-      onTap: onTap,
-    );
-  }
-
-  Widget _buildSettings(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
-      body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+    Widget row(IconData icon, String title, String subtitle, Widget screen) =>
+        SettingsRow(
+          icon: icon,
+          title: title,
+          subtitle: subtitle,
+          card: false,
+          showChevron: true,
+          onTap: () => open(screen),
+        );
+    Widget section(String title, List<Widget> rows) => Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionTitle('Account', colors),
-          _settingTile(
-            colors,
-            Icons.person_outline,
-            'Account',
-            'Profile, phone number and personal details',
-            () => Navigator.push(
-              context,
-              MaterialPageRoute<void>(
-                builder: (_) => const SettingsScreenAccount(),
-              ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+            child: Text(
+              title,
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(color: colors.primary),
             ),
           ),
-          _divider(colors),
-          _sectionTitle('Security & Privacy', colors),
-          _settingTile(
-            colors,
-            Icons.security_outlined,
-            'Security',
-            'Password and account protection',
-            () {},
+          GradientCard(
+            clipBehavior: Clip.antiAlias,
+            child: Column(children: rows),
           ),
-          _divider(colors, indent: 72),
-          _settingTile(
-            colors,
-            Icons.lock_outline,
-            'Privacy',
-            'Control who can contact you',
-            () {},
-          ),
-          _divider(colors),
-          _sectionTitle('Notifications', colors),
-          _settingTile(
-            colors,
-            Icons.notifications_outlined,
-            'Notifications',
-            'Notification preferences and exceptions',
-            () => Navigator.push(
-              context,
-              MaterialPageRoute<void>(
-                builder: (_) => const SettingsScreenNotifications(),
-              ),
+        ],
+      ),
+    );
+    return AppScaffold(
+      appBar: AppBar(
+        flexibleSpace: const GradientHeader(),
+        title: const Text('Settings'),
+      ),
+      drawer: MediaQuery.sizeOf(context).width >= 840
+          ? null
+          : AppDrawer(
+              selectedSection: MainSection.settings,
+              onSectionSelected: onSectionSelected,
             ),
-          ),
+      body: ListView(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        children: [
+          section('Account', [
+            row(
+              Icons.person_outline,
+              'Account',
+              'Profile, phone number and personal details',
+              SettingsScreenAccount(authApi: authApi),
+            ),
+          ]),
+          section('Security & Privacy', [
+            row(
+              Icons.security_outlined,
+              'Security',
+              'Password and account protection',
+              const SettingsScreenSecurity(),
+            ),
+            const Divider(height: 1, indent: 68, endIndent: 16),
+            row(
+              Icons.lock_outline,
+              'Privacy',
+              'Control who can contact you',
+              const SettingsScreenPrivacy(),
+            ),
+          ]),
+          section('Notifications', [
+            row(
+              Icons.notifications_outlined,
+              'Notifications',
+              'Notification preferences and exceptions',
+              const SettingsScreenNotifications(),
+            ),
+          ]),
         ],
       ),
     );
