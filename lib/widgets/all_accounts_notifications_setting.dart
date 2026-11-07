@@ -68,11 +68,9 @@ class _AllAccountsNotificationsSettingState
           : 'Only notify for the active account',
       height: 88,
       onTap: _failed ? _load : null,
-      trailing: Switch(
-        key: const ValueKey('notifications_all_accounts'),
-        value: _enabled ?? true,
-        onChanged: _enabled != null && !_saving ? _change : null,
-      ),
+      switchKey: const ValueKey('notifications_all_accounts'),
+      switchValue: _enabled ?? true,
+      onSwitchChanged: _enabled != null && !_saving ? _change : null,
     ),
   );
 }

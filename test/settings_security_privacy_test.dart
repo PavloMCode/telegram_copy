@@ -78,6 +78,8 @@ void main() {
       120,
       scrollable: find.byType(Scrollable).first,
     );
+    await tester.ensureVisible(find.text('Blocked users'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Blocked users'));
     await tester.pumpAndSettle();
     expect(find.text('No blocked users'), findsOneWidget);

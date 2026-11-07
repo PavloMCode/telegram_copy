@@ -53,7 +53,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Open navigation menu'));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(ListTile, 'Settings'));
+      await tester.tap(
+        find.widgetWithText(NavigationDrawerDestination, 'Settings'),
+      );
       await tester.pumpAndSettle();
       expectTheme(find.byType(SettingsScreen));
 

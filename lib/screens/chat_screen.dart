@@ -1,3 +1,4 @@
+import '../widgets/gradient_surfaces.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/local_account_store.dart';
@@ -383,7 +384,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final result = await showDialog<String>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, updateDialog) => AlertDialog(
+        builder: (dialogContext, updateDialog) => GradientAlertDialog(
           title: const Text('Edit message'),
           content: SizedBox(
             width: 400,
@@ -500,11 +501,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         (AccountDataScope.maybeOf(context)?.contacts ?? DemoContacts.all)
             .where((contact) => contact.id == widget.chatId)
             .firstOrNull;
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(
+        flexibleSpace: const GradientHeader(),
         elevation: 0,
         scrolledUnderElevation: 0,
-        toolbarHeight: ChatLayout.appBarHeight,
+        toolbarHeight: ChatLayout.appBarHeightFor(context),
         titleSpacing: ChatLayout.space16,
         actionsPadding: const EdgeInsets.only(right: ChatLayout.space16),
         title: ChatHeaderTitle(

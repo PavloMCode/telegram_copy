@@ -9,6 +9,8 @@ import 'auth_api.dart';
 
 /// Local test accounts for frontend development only.
 class LocalAuthApi extends AuthApi {
+  static const testAdminEmail = 'admin@example.com';
+  static const testAdminPassword = 'admin-password';
   static const _storageKey = 'debug_auth_accounts_v1';
   static const _sessionKey = 'debug_auth_session_v1';
   static const _sessionsKey = 'debug_auth_sessions_v2';
@@ -36,6 +38,46 @@ class LocalAuthApi extends AuthApi {
 
   String _digest(String salt, String password) =>
       sha256.convert(utf8.encode('$salt:$password')).toString();
+
+  /// The reserved debug account must match the credentials shown by the form.
+  /// Keep its identity and local data when correcting an older test password.
+  Future<void> _ensureTestAdmin() {
+    _requireDebug();
+    final operation = _sessionWrites.then((_) async {
+      final accounts = await _accounts();
+      final existing = accounts[testAdminEmail] as Map<String, dynamic>?;
+      if (existing != null &&
+          existing['passwordHash'] ==
+              _digest(existing['salt'] as String, testAdminPassword)) {
+        return;
+      }
+      var phone = existing?['phone'] as String? ?? '+441234567890';
+      if (existing == null) {
+        var suffix = 0;
+        while (accounts.values.any((account) => account['phone'] == phone)) {
+          phone = '+${999000000000 + suffix++}';
+        }
+      }
+      final random = Random.secure();
+      final salt = base64Encode(List.generate(32, (_) => random.nextInt(256)));
+      accounts[testAdminEmail] = {
+        ...?existing,
+        'email': testAdminEmail,
+        'name': existing?['name'] ?? 'Admin',
+        'phone': phone,
+        'salt': salt,
+        'passwordHash': _digest(salt, testAdminPassword),
+      };
+      final preferences = await SharedPreferences.getInstance();
+      if (!await preferences.setString(_storageKey, jsonEncode(accounts))) {
+        throw const AuthException(
+          'Could not prepare the local test admin. Please try again.',
+        );
+      }
+    });
+    _sessionWrites = operation.catchError((Object _) {});
+    return operation;
+  }
 
   Future<Map<String, dynamic>> _sessions() async {
     _requireDebug();
@@ -183,6 +225,10 @@ class LocalAuthApi extends AuthApi {
   }) async {
     _pending = null;
     _challengeId = null;
+    if (email.trim().toLowerCase() == testAdminEmail &&
+        password == testAdminPassword) {
+      await _ensureTestAdmin();
+    }
     final accounts = await _accounts();
     final account =
         accounts[email.trim().toLowerCase()] as Map<String, dynamic>?;

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../navigation/main_section.dart';
 import '../screens/chat_screen.dart';
-import '../theme/app_theme.dart';
 import 'drawer_profile_header.dart';
 import 'group_scope.dart';
 import 'auth_session_scope.dart';
@@ -9,105 +8,54 @@ import 'account_data_scope.dart';
 import '../services/local_auth_api.dart';
 import '../screens/accounts_screen.dart';
 
-abstract final class _DrawerLayout {
-  static const width = 280.0;
-  static const itemHeight = 52.0;
-  static const iconSize = 22.0;
-  static const horizontalPadding = 16.0;
-  static const selectedRadius = 12.0;
-  static const headerGap = 12.0;
-}
-
-/// Shared drawer for the three top-level sections.
+/// Standard M3 destinations with the existing account header and actions.
 class AppDrawer extends StatelessWidget {
   const AppDrawer({
     super.key,
     required this.selectedSection,
     required this.onSectionSelected,
   });
-
   final MainSection selectedSection;
   final ValueChanged<MainSection> onSectionSelected;
 
-  void _select(BuildContext context, MainSection section) {
-    Scaffold.of(context).closeDrawer();
-    onSectionSelected(section);
-  }
-
-  void _openSavedMessages(BuildContext context) {
-    Scaffold.of(context).closeDrawer();
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => GroupScope.wrap(
-          context,
-          const ChatScreen(chatId: 'saved', chatName: 'Saved Messages'),
-        ),
-      ),
-    );
-  }
-
-  Widget _drawerItem(
-    ColorScheme colors, {
-    required String title,
-    required IconData icon,
-    required VoidCallback onTap,
-    bool selected = false,
-  }) => Padding(
-    // Split the 16 px inset between the background and its content.
-    padding: const EdgeInsets.symmetric(
-      horizontal: _DrawerLayout.horizontalPadding / 2,
-    ),
-    child: SizedBox(
-      height: _DrawerLayout.itemHeight,
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: _DrawerLayout.horizontalPadding / 2,
-        ),
-        minLeadingWidth: _DrawerLayout.iconSize,
-        horizontalTitleGap: _DrawerLayout.horizontalPadding,
-        minTileHeight: _DrawerLayout.itemHeight,
-        minVerticalPadding: 0,
-        visualDensity: VisualDensity.standard,
-        titleAlignment: ListTileTitleAlignment.center,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(_DrawerLayout.selectedRadius),
-        ),
-        selected: selected,
-        selectedTileColor: colors.primaryContainer,
-        selectedColor: colors.onPrimaryContainer,
-        iconColor: colors.onSurfaceVariant,
-        textColor: colors.onSurface,
-        leading: Icon(icon, size: _DrawerLayout.iconSize),
-        title: Text(
-          title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-          ),
-        ),
-        onTap: onTap,
-      ),
-    ),
-  );
-
   @override
   Widget build(BuildContext context) {
-    final colors = AppTheme.colorsOf(context);
     final api = AuthSessionScope.maybeOf(context);
-    return Drawer(
-      width: _DrawerLayout.width,
-      child: ListView(
-        padding: const EdgeInsets.only(bottom: 16),
+    final selected = switch (selectedSection) {
+      MainSection.chats => 0,
+      MainSection.contacts => 1,
+      MainSection.settings => 3,
+    };
+    return SizedBox(
+      width: 304,
+      child: NavigationDrawer(
+        selectedIndex: selected,
+        onDestinationSelected: (index) {
+          Scaffold.of(context).closeDrawer();
+          if (index == 2) {
+            final screen = GroupScope.wrap(
+              context,
+              const ChatScreen(chatId: 'saved', chatName: 'Saved Messages'),
+            );
+            Navigator.of(
+              context,
+            ).push(MaterialPageRoute<void>(builder: (_) => screen));
+          } else {
+            onSectionSelected(switch (index) {
+              0 => MainSection.chats,
+              1 => MainSection.contacts,
+              _ => MainSection.settings,
+            });
+          }
+        },
         children: [
           const DrawerProfileHeader(),
-          const SizedBox(height: _DrawerLayout.headerGap),
+          const SizedBox(height: 12),
           if (api is LocalAuthApi)
-            _drawerItem(
-              colors,
-              title: 'Accounts',
-              icon: Icons.manage_accounts_outlined,
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 28),
+              leading: const Icon(Icons.manage_accounts_outlined),
+              title: const Text('Accounts'),
               onTap: () {
                 final activeId = AccountDataScope.maybeOf(context)!.accountId;
                 Scaffold.of(context).closeDrawer();
@@ -121,43 +69,55 @@ class AppDrawer extends StatelessWidget {
                 );
               },
             ),
-          _drawerItem(
-            colors,
-            title: 'Chats',
-            icon: Icons.chat_bubble_outline_rounded,
-            selected: selectedSection == MainSection.chats,
-            onTap: () => _select(context, MainSection.chats),
-          ),
-          _drawerItem(
-            colors,
-            title: 'Contacts',
-            icon: Icons.person_outline,
-            selected: selectedSection == MainSection.contacts,
-            onTap: () => _select(context, MainSection.contacts),
-          ),
-          _drawerItem(
-            colors,
-            title: 'Saved Messages',
-            icon: Icons.bookmark_border,
-            onTap: () => _openSavedMessages(context),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Divider(
-              height: 1,
-              thickness: 1,
-              indent: _DrawerLayout.horizontalPadding,
-              endIndent: _DrawerLayout.horizontalPadding,
-              color: colors.subtleDivider,
+          const NavigationDrawerDestination(
+            icon: Icon(Icons.chat_bubble_outline_rounded),
+            selectedIcon: Icon(Icons.chat_bubble_rounded),
+            label: Flexible(
+              child: Text(
+                'Chats',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ),
-          _drawerItem(
-            colors,
-            title: 'Settings',
-            icon: Icons.settings_outlined,
-            selected: selectedSection == MainSection.settings,
-            onTap: () => _select(context, MainSection.settings),
+          const NavigationDrawerDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: Flexible(
+              child: Text(
+                'Contacts',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ),
+          const NavigationDrawerDestination(
+            icon: Icon(Icons.bookmark_border),
+            selectedIcon: Icon(Icons.bookmark),
+            label: Flexible(
+              child: Text(
+                'Saved Messages',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+            child: Divider(),
+          ),
+          const NavigationDrawerDestination(
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings),
+            label: Flexible(
+              child: Text(
+                'Settings',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
         ],
       ),
     );

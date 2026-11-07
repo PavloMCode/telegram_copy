@@ -1,3 +1,4 @@
+import '../widgets/gradient_surfaces.dart';
 import 'package:flutter/material.dart';
 import '../services/auth_api.dart';
 import '../services/local_auth_api.dart';
@@ -103,8 +104,11 @@ class _AccountsScreenState extends State<AccountsScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Accounts')),
+  Widget build(BuildContext context) => AppScaffold(
+    appBar: AppBar(
+      flexibleSpace: const GradientHeader(),
+      title: const Text('Accounts'),
+    ),
     body: _error != null
         ? Center(
             child: Column(

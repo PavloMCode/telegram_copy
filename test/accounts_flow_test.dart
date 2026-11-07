@@ -63,14 +63,16 @@ void main() {
       expect((await LocalAuthApi().restoreSession())?.name, 'Admin');
       await tester.tap(find.byTooltip('Open navigation menu'));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(ListTile, 'Settings'));
+      await tester.tap(
+        find.widgetWithText(NavigationDrawerDestination, 'Settings'),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.text('Notification preferences and exceptions'));
       await tester.pumpAndSettle();
       final allAccounts = find.byKey(
         const ValueKey('notifications_all_accounts'),
       );
-      expect(tester.widget<Switch>(allAccounts).value, isTrue);
+      expect(tester.widget<SwitchListTile>(allAccounts).value, isTrue);
       await tester.tap(allAccounts);
       await tester.pumpAndSettle();
       expect(await LocalAuthApi().notificationsFromAllAccounts(), isFalse);

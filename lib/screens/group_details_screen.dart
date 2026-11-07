@@ -1,3 +1,4 @@
+import '../widgets/gradient_surfaces.dart';
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -64,7 +65,7 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
         .where((c) => group.roleOf(c.id) == null)
         .toList();
     final selected = <String>{};
-    final result = await showModalBottomSheet<List<String>>(
+    final result = await showGradientBottomSheet<List<String>>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
@@ -137,7 +138,7 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
         !owner && member.role == GroupRole.admin) {
       return;
     }
-    final action = await showModalBottomSheet<String>(
+    final action = await showGradientBottomSheet<String>(
       context: context,
       showDragHandle: true,
       builder: (sheetContext) => SafeArea(
@@ -253,7 +254,12 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
     builder: (context, _) {
       final group = widget.store.find(widget.groupId);
       if (group == null) {
-        return Scaffold(appBar: AppBar(title: const Text('Group settings')));
+        return AppScaffold(
+          appBar: AppBar(
+            flexibleSpace: const GradientHeader(),
+            title: const Text('Group settings'),
+          ),
+        );
       }
       final colors = Theme.of(context).colorScheme;
       final manage = group.canManage(widget.store.userId);
@@ -261,8 +267,9 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
       final media = group.media
           .where((item) => _filter == null || item.kind == _filter)
           .toList();
-      return Scaffold(
+      return AppScaffold(
         appBar: AppBar(
+          flexibleSpace: const GradientHeader(),
           title: const Text('Group settings'),
           actions: [
             if (manage)
@@ -493,8 +500,11 @@ class _GroupEditorState extends State<_GroupEditor> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Edit group')),
+  Widget build(BuildContext context) => AppScaffold(
+    appBar: AppBar(
+      flexibleSpace: const GradientHeader(),
+      title: const Text('Edit group'),
+    ),
     body: Form(
       key: _form,
       child: ListView(

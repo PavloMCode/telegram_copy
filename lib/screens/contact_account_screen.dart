@@ -1,3 +1,5 @@
+import '../theme/app_gradients.dart';
+import '../widgets/gradient_surfaces.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../data/demo_data.dart';
@@ -117,8 +119,9 @@ class _ContactAccountScreenState extends State<ContactAccountScreen> {
             .where((group) => group.roleOf(contact.id) != null)
             .toList() ??
         <LocalGroup>[];
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(
+        flexibleSpace: const GradientHeader(),
         title: const Text('Contact'),
         actions: [
           PopupMenuButton<String>(
@@ -165,7 +168,7 @@ class _ContactAccountScreenState extends State<ContactAccountScreen> {
           children: [
             DecoratedBox(
               decoration: BoxDecoration(
-                color: colors.surfaceContainerLow,
+                gradient: AppGradients.panel(colors),
                 borderRadius: BorderRadius.circular(24),
               ),
               child: Padding(
@@ -230,9 +233,14 @@ class _ContactAccountScreenState extends State<ContactAccountScreen> {
             const SizedBox(height: 28),
             _section(context, 'Contact information'),
             const SizedBox(height: 8),
-            Material(
+            GradientCard(
               color: colors.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(16),
+              shape: GradientBorder(
+                base: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                gradient: AppGradients.panel(colors),
+              ),
               clipBehavior: Clip.antiAlias,
               child: ListTile(
                 contentPadding: const EdgeInsets.symmetric(
@@ -265,7 +273,7 @@ class _ContactAccountScreenState extends State<ContactAccountScreen> {
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: colors.surfaceContainerLow,
+                  gradient: AppGradients.panel(colors),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Row(

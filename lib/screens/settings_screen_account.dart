@@ -1,3 +1,4 @@
+import '../widgets/gradient_surfaces.dart';
 import 'dart:typed_data';
 import 'dart:convert';
 import '../services/local_account_store.dart';
@@ -17,7 +18,6 @@ abstract final class _AccountLayout {
   static const avatarSize = 72.0;
   static const cameraSize = 28.0;
   static const fieldHeight = 48.0;
-  static const fieldRadius = 12.0;
   static const fieldGap = 12.0;
   static const pagePadding = 24.0;
 }
@@ -153,7 +153,7 @@ class _SettingsScreenAccountState extends State<SettingsScreenAccount> {
     _photoMenuOpen = true;
 
     try {
-      final choosePhoto = await showModalBottomSheet<bool>(
+      final choosePhoto = await showGradientBottomSheet<bool>(
         context: context,
         showDragHandle: true,
         useSafeArea: true,
@@ -243,13 +243,13 @@ class _SettingsScreenAccountState extends State<SettingsScreenAccount> {
           Positioned(
             right: 0,
             bottom: 0,
-            child: IconButton.filled(
+            child: IconButton.filledTonal(
               tooltip: 'Change profile photo',
               style: IconButton.styleFrom(
-                backgroundColor: colors.primary,
-                foregroundColor: colors.onPrimary,
-                disabledBackgroundColor: colors.primary,
-                disabledForegroundColor: colors.onPrimary,
+                backgroundColor: colors.secondaryContainer,
+                foregroundColor: colors.onSecondaryContainer,
+                disabledBackgroundColor: colors.secondaryContainer,
+                disabledForegroundColor: colors.onSecondaryContainer,
                 minimumSize: const Size(
                   _AccountLayout.cameraSize,
                   _AccountLayout.cameraSize,
@@ -271,7 +271,7 @@ class _SettingsScreenAccountState extends State<SettingsScreenAccount> {
                       height: 14,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: colors.onPrimary,
+                        color: colors.onSecondaryContainer,
                       ),
                     )
                   : const Icon(Icons.camera_alt_outlined, size: 16),
@@ -292,11 +292,6 @@ class _SettingsScreenAccountState extends State<SettingsScreenAccount> {
         fontSize: 13,
       ),
     ),
-  );
-
-  OutlineInputBorder _fieldBorder(BorderSide side) => OutlineInputBorder(
-    borderRadius: BorderRadius.circular(_AccountLayout.fieldRadius),
-    borderSide: side,
   );
 
   Widget _field(
@@ -324,8 +319,10 @@ class _SettingsScreenAccountState extends State<SettingsScreenAccount> {
               _focusedFields.remove(label);
             }
           }),
-          child: SizedBox(
-            height: _AccountLayout.fieldHeight,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              minHeight: _AccountLayout.fieldHeight,
+            ),
             child: TextFormField(
               initialValue: _values[label] ?? initialValue,
               onChanged: (text) => _values[label] = text,
@@ -336,7 +333,6 @@ class _SettingsScreenAccountState extends State<SettingsScreenAccount> {
               autofillHints: autofillHints,
               minLines: 1,
               maxLines: maxLines,
-              style: const TextStyle(fontSize: 14),
               textInputAction: last
                   ? TextInputAction.done
                   : (maxLines > 1
@@ -360,14 +356,6 @@ class _SettingsScreenAccountState extends State<SettingsScreenAccount> {
                   horizontal: 12,
                   vertical: 12,
                 ),
-                fillColor: colors.surfaceContainerLow,
-                border: _fieldBorder(BorderSide.none),
-                enabledBorder: _fieldBorder(
-                  BorderSide(color: colors.inputOutline),
-                ),
-                focusedBorder: _fieldBorder(
-                  BorderSide(color: colors.primary, width: 2),
-                ),
               ),
             ),
           ),
@@ -381,7 +369,7 @@ class _SettingsScreenAccountState extends State<SettingsScreenAccount> {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: colors.secondaryText,
-                fontSize: 11,
+                fontSize: 12,
                 height: 1.2,
               ),
             ),
@@ -395,8 +383,11 @@ class _SettingsScreenAccountState extends State<SettingsScreenAccount> {
     final colors = AppTheme.colorsOf(context);
     final profile = ProfileScope.of(context);
     final names = profile.name.trim().split(RegExp(r'\s+'));
-    return Scaffold(
-      appBar: AppBar(title: const Text('Account')),
+    return AppScaffold(
+      appBar: AppBar(
+        flexibleSpace: const GradientHeader(),
+        title: const Text('Account'),
+      ),
       body: ListView(
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: const EdgeInsets.fromLTRB(

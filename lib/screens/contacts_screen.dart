@@ -1,3 +1,4 @@
+import '../widgets/gradient_surfaces.dart';
 import 'package:flutter/material.dart';
 import '../navigation/main_section.dart';
 import '../theme/app_theme.dart';
@@ -44,17 +45,19 @@ class _ContactsScreenState extends State<ContactsScreen> {
                   contact.phone.contains(query),
             )
             .toList();
-    return Scaffold(
+    return AppScaffold(
       appBar: SearchAppBar(
         title: 'Contacts',
         hintText: 'Search contacts',
         controller: _searchController,
         onChanged: (_) => setState(() {}),
       ),
-      drawer: AppDrawer(
-        selectedSection: MainSection.contacts,
-        onSectionSelected: widget.onSectionSelected,
-      ),
+      drawer: MediaQuery.sizeOf(context).width >= 840
+          ? null
+          : AppDrawer(
+              selectedSection: MainSection.contacts,
+              onSectionSelected: widget.onSectionSelected,
+            ),
       body: Column(
         children: [
           Expanded(
@@ -134,7 +137,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: GradientFab(
         tooltip: 'Contact actions',
         onPressed: () => _showContactActions(context),
         child: const Icon(Icons.more_vert),
@@ -144,7 +147,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
 
   void _showContactActions(BuildContext context) {
     FocusScope.of(context).unfocus();
-    showModalBottomSheet<void>(
+    showGradientBottomSheet<void>(
       context: context,
       showDragHandle: true,
       backgroundColor: AppTheme.colorsOf(context).surfaceContainer,
@@ -214,7 +217,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
     final data = AccountDataScope.maybeOf(context);
     final contactStore = ContactScope.maybeOf(context);
     if (data == null) return;
-    final contact = await showModalBottomSheet<DemoContact>(
+    final contact = await showGradientBottomSheet<DemoContact>(
       context: context,
       showDragHandle: true,
       builder: (sheetContext) => SafeArea(

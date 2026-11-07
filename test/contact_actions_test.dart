@@ -108,7 +108,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Open navigation menu'));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(ListTile, 'Contacts'));
+      await tester.tap(
+        find.widgetWithText(NavigationDrawerDestination, 'Contacts'),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(ListTile, 'Anna'));
       await tester.pumpAndSettle();
@@ -133,7 +135,9 @@ void main() {
       );
       await tester.tap(find.byTooltip('Open navigation menu'));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(ListTile, 'Chats'));
+      await tester.tap(
+        find.widgetWithText(NavigationDrawerDestination, 'Chats'),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('New message'));
       await tester.pumpAndSettle();

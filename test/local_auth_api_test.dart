@@ -8,6 +8,87 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   test(
+    'Prefilled admin works with fresh storage and still requires verification',
+    () async {
+      final api = LocalAuthApi();
+      final challenge = await api.login(
+        email: LocalAuthApi.testAdminEmail,
+        password: LocalAuthApi.testAdminPassword,
+      );
+      expect(await api.restoreSession(), isNull);
+      await expectLater(
+        api.verify(challenge.id, '000000'),
+        throwsA(isA<AuthException>()),
+      );
+      expect(await api.restoreSession(), isNull);
+      expect((await api.verify(challenge.id, '123456')).name, 'Admin');
+      await api.logout();
+      final restarted = LocalAuthApi();
+      final next = await restarted.login(
+        email: LocalAuthApi.testAdminEmail,
+        password: LocalAuthApi.testAdminPassword,
+      );
+      expect((await restarted.verify(next.id, '123456')).name, 'Admin');
+    },
+  );
+
+  test(
+    'Correcting old admin password preserves profile and other accounts',
+    () async {
+      final api = LocalAuthApi();
+      var challenge = await api.register(
+        phone: '+380991234567',
+        name: 'Existing admin',
+        email: LocalAuthApi.testAdminEmail,
+        password: 'older-test-password',
+      );
+      await api.verify(challenge.id, '123456');
+      challenge = await api.register(
+        phone: '+380991234568',
+        name: 'Other user',
+        email: 'other@example.com',
+        password: 'other-user-password',
+      );
+      await api.verify(challenge.id, '123456');
+      final restarted = LocalAuthApi();
+      challenge = await restarted.login(
+        email: LocalAuthApi.testAdminEmail,
+        password: LocalAuthApi.testAdminPassword,
+      );
+      expect((await restarted.restoreSession())?.name, 'Other user');
+      final admin = await restarted.verify(challenge.id, '123456');
+      expect(admin.name, 'Existing admin');
+      expect(admin.phone, '+380991234567');
+      challenge = await restarted.login(
+        email: 'other@example.com',
+        password: 'other-user-password',
+      );
+      expect(
+        (await restarted.verify(challenge.id, '123456')).name,
+        'Other user',
+      );
+    },
+  );
+
+  test('A test admin does not reuse another account phone', () async {
+    final api = LocalAuthApi();
+    final user = await api.register(
+      phone: '+441234567890',
+      name: 'Original user',
+      email: 'original@example.com',
+      password: 'original-password',
+    );
+    await api.verify(user.id, '123456');
+    final challenge = await api.login(
+      email: LocalAuthApi.testAdminEmail,
+      password: LocalAuthApi.testAdminPassword,
+    );
+    final admin = await api.verify(challenge.id, '123456');
+    expect(admin.phone, isNot('+441234567890'));
+    expect((await api.signedInProfiles()).length, 2);
+  });
+
+  test(
     'Multiple verified sessions switch, restore, filter notifications and log out independently',
     () async {
       final api = LocalAuthApi();

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import 'chat_layout.dart';
+import '../../theme/app_gradients.dart';
 
 class ChatReplyBanner extends StatelessWidget {
   const ChatReplyBanner({
@@ -21,7 +22,7 @@ class ChatReplyBanner extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
       padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
       decoration: BoxDecoration(
-        color: colors.surfaceContainerLow,
+        gradient: AppGradients.panel(colors),
         borderRadius: BorderRadius.circular(18),
       ),
       child: Row(

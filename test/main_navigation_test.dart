@@ -20,7 +20,7 @@ Future<void> openDrawer(WidgetTester tester) async {
 
 Future<void> selectSection(WidgetTester tester, String title) async {
   await openDrawer(tester);
-  await tester.tap(find.widgetWithText(ListTile, title));
+  await tester.tap(find.widgetWithText(NavigationDrawerDestination, title));
   await tester.pumpAndSettle();
 }
 
@@ -68,21 +68,17 @@ void main() {
         tester.widget<AppDrawer>(find.byType(AppDrawer)).selectedSection,
         section,
       );
-      for (final label in ['Chats', 'Contacts', 'Settings']) {
-        expect(
-          tester
-              .widget<ListTile>(find.widgetWithText(ListTile, label))
-              .selected,
-          label == title,
-        );
-      }
       expect(
         tester
-            .widget<ListTile>(find.widgetWithText(ListTile, 'Saved Messages'))
-            .selected,
-        isFalse,
+            .widget<NavigationDrawer>(find.byType(NavigationDrawer))
+            .selectedIndex,
+        switch (section) {
+          MainSection.chats => 0,
+          MainSection.contacts => 1,
+          MainSection.settings => 3,
+        },
       );
-      await tester.tap(find.widgetWithText(ListTile, title));
+      await tester.tap(find.widgetWithText(NavigationDrawerDestination, title));
       await tester.pumpAndSettle();
       expectMainSection(tester, screen);
     }
@@ -183,36 +179,44 @@ void main() {
     expectMainSection(tester, SettingsScreen);
   });
 
-  testWidgets('Search closes on focus loss and outside buttons remain usable', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      const TelegramApp(initialProfile: AuthProfile('Admin', '+380991234567')),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Search'));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'Anna');
-    await tester.pumpAndSettle();
-    await selectSection(tester, 'Contacts');
-    await tester.tap(find.byTooltip('Search'));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'Maksym');
-    await tester.pumpAndSettle();
-    await selectSection(tester, 'Chats');
-    expectMainSection(tester, HomeScreen);
-    expect(find.byType(TextField), findsNothing);
-    expect(find.text('Study Group'), findsOneWidget);
-    await selectSection(tester, 'Contacts');
-    expectMainSection(tester, ContactsScreen);
-    expect(find.byType(TextField), findsNothing);
-    await tester.tap(find.byTooltip('Search'));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'Anna');
-    await tester.tap(find.byTooltip('Contact actions'));
-    await tester.pumpAndSettle();
-    expect(find.byType(TextField), findsNothing);
-    expect(find.text('Add contact'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
+  testWidgets(
+    'Search keeps query on focus loss and has separate clear and back actions',
+    (tester) async {
+      await tester.pumpWidget(
+        const TelegramApp(
+          initialProfile: AuthProfile('Admin', '+380991234567'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Search'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'Anna');
+      await tester.pumpAndSettle();
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<SearchBar>(find.byType(SearchBar)).controller!.text,
+        'Anna',
+      );
+      expect(find.text('Study Group'), findsNothing);
+      await tester.tap(find.byTooltip('Clear search'));
+      await tester.pumpAndSettle();
+      expect(find.byType(SearchBar), findsOneWidget);
+      expect(find.text('Study Group'), findsOneWidget);
+      await tester.tap(find.byTooltip('Close search'));
+      await tester.pumpAndSettle();
+      await selectSection(tester, 'Contacts');
+      await tester.tap(find.byTooltip('Search'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'Anna');
+      await tester.tap(find.byTooltip('Contact actions'));
+      await tester.pumpAndSettle();
+      expect(find.text('Add contact'), findsOneWidget);
+      expect(
+        tester.widget<SearchBar>(find.byType(SearchBar)).controller!.text,
+        'Anna',
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

@@ -1,3 +1,4 @@
+import '../widgets/gradient_surfaces.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
@@ -94,7 +95,7 @@ class _SettingsScreenSecurityState extends State<SettingsScreenSecurity> {
     );
   }
 
-  Future<void> _showSessions() => showModalBottomSheet<void>(
+  Future<void> _showSessions() => showGradientBottomSheet<void>(
     context: context,
     showDragHandle: true,
     useSafeArea: true,
@@ -137,12 +138,15 @@ class _SettingsScreenSecurityState extends State<SettingsScreenSecurity> {
   Widget build(BuildContext context) {
     final colors = AppTheme.colorsOf(context);
     final passcodeEnabled = _values['security_passcode'] ?? false;
-    return Scaffold(
-      appBar: AppBar(title: const Text('Security')),
+    return AppScaffold(
+      appBar: AppBar(
+        flexibleSpace: const GradientHeader(),
+        title: const Text('Security'),
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
         children: [
-          Card(
+          GradientCard(
             elevation: 0,
             color: colors.primaryContainer,
             child: Padding(

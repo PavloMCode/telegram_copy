@@ -1,3 +1,4 @@
+import '../gradient_surfaces.dart';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -124,7 +125,7 @@ Future<void> forwardChatMessage(
     recipients.removeWhere(
       (id, recipient) => id == sourceId || contacts?.isBlocked(id) == true,
     );
-    final recipient = await showModalBottomSheet<ForwardRecipient>(
+    final recipient = await showGradientBottomSheet<ForwardRecipient>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,

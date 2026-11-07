@@ -84,7 +84,9 @@ void main() {
     await tester.tap(find.byTooltip('Open navigation menu'));
     await tester.pumpAndSettle();
     expect(find.text('Log out'), findsNothing);
-    await tester.tap(find.widgetWithText(ListTile, 'Settings'));
+    await tester.tap(
+      find.widgetWithText(NavigationDrawerDestination, 'Settings'),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Profile, phone number and personal details'));
     await tester.pumpAndSettle();

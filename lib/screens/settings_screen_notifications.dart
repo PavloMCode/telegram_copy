@@ -1,3 +1,4 @@
+import '../widgets/gradient_surfaces.dart';
 import 'package:flutter/material.dart';
 import '../models/notification_category.dart';
 import '../theme/app_theme.dart';
@@ -76,17 +77,18 @@ class _SettingsScreenNotificationsState
         title: title,
         subtitle: subtitle,
         height: 80,
-        trailing: Switch(
-          key: ValueKey(key),
-          value: master ? enabled : data?.setting(key) ?? true,
-          onChanged: ready && !_saving && (master || enabled)
-              ? (value) => _change(key, value)
-              : null,
-        ),
+        switchKey: ValueKey(key),
+        switchValue: master ? enabled : data?.setting(key) ?? true,
+        onSwitchChanged: ready && !_saving && (master || enabled)
+            ? (value) => _change(key, value)
+            : null,
       ),
     );
-    return Scaffold(
-      appBar: AppBar(title: const Text('Notifications')),
+    return AppScaffold(
+      appBar: AppBar(
+        flexibleSpace: const GradientHeader(),
+        title: const Text('Notifications'),
+      ),
       body: data != null && !data.loaded
           ? const Center(child: CircularProgressIndicator())
           : ListView(

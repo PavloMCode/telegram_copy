@@ -1,6 +1,8 @@
+import '../widgets/gradient_surfaces.dart';
 import 'package:flutter/material.dart';
 import '../navigation/main_section.dart';
 import '../theme/app_theme.dart';
+import '../theme/app_gradients.dart';
 import '../data/demo_data.dart';
 import 'chat_screen.dart';
 import 'create_conversation_screen.dart';
@@ -13,6 +15,8 @@ import '../services/local_group_store.dart';
 import 'group_chat_screen.dart';
 import '../widgets/chat_list_actions.dart';
 
+enum _ChatFilter { all, unread, groups, channels }
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
@@ -20,12 +24,16 @@ class HomeScreen extends StatefulWidget {
     this.phone = '+380 99 123 45 67',
     this.authApi,
     required this.onSectionSelected,
+    this.onConversationSelected,
+    this.selectedChatId,
   });
 
   final String userName;
   final String phone;
   final AuthApi? authApi;
   final ValueChanged<MainSection> onSectionSelected;
+  final void Function(String id, Widget screen)? onConversationSelected;
+  final String? selectedChatId;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -33,6 +41,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final _searchController = TextEditingController();
+  _ChatFilter _filter = _ChatFilter.all;
   LocalGroupStore? _groups;
 
   @override
@@ -127,14 +136,22 @@ class _HomeScreenState extends State<HomeScreen> {
           (chat) =>
               !(data?.isChatDeleted(chat.id) ?? false) &&
               (chat.name.toLowerCase().contains(query) ||
-                  chat.message.toLowerCase().contains(query)),
+                  chat.message.toLowerCase().contains(query)) &&
+              switch (_filter) {
+                _ChatFilter.all => true,
+                _ChatFilter.unread => chat.unread > 0,
+                _ChatFilter.groups =>
+                  chat.group && !(_groups?.find(chat.id)?.isChannel ?? false),
+                _ChatFilter.channels =>
+                  _groups?.find(chat.id)?.isChannel ?? false,
+              },
         )
         .toList();
     final orderedChats = [
       ...chats.where((chat) => chat.pinned),
       ...chats.where((chat) => !chat.pinned),
     ];
-    return Scaffold(
+    return AppScaffold(
       backgroundColor: colors.surface,
       appBar: SearchAppBar(
         title: 'Chats',
@@ -143,70 +160,124 @@ class _HomeScreenState extends State<HomeScreen> {
         titleStyle: const TextStyle(fontSize: 21, fontWeight: FontWeight.w600),
         onChanged: (_) => setState(() {}),
       ),
-      drawer: AppDrawer(
-        selectedSection: MainSection.chats,
-        onSectionSelected: widget.onSectionSelected,
-      ),
+      drawer: MediaQuery.sizeOf(context).width >= 840
+          ? null
+          : AppDrawer(
+              selectedSection: MainSection.chats,
+              onSectionSelected: widget.onSectionSelected,
+            ),
       body: SafeArea(
         top: false,
-        child: chats.isEmpty
-            ? Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.search_off,
-                      size: 48,
-                      color: colors.onSurfaceVariant,
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'No chats found',
-                      style: TextStyle(
-                        color: colors.onSurfaceVariant,
-                        fontSize: 16,
+        child: Column(
+          children: [
+            SizedBox(
+              height: 56,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                children: [
+                  for (final filter in _ChatFilter.values)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        showCheckmark: true,
+                        labelStyle: TextStyle(
+                          color: _filter == filter
+                              ? colors.onSecondaryContainer
+                              : colors.onSurfaceVariant,
+                          fontWeight: _filter == filter
+                              ? FontWeight.w600
+                              : FontWeight.normal,
+                        ),
+                        shape: _filter == filter
+                            ? GradientBorder(
+                                base: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                gradient: AppGradients.header(colors),
+                              )
+                            : null,
+                        label: Text(switch (filter) {
+                          _ChatFilter.all => 'All',
+                          _ChatFilter.unread => 'Unread',
+                          _ChatFilter.groups => 'Groups',
+                          _ChatFilter.channels => 'Channels',
+                        }),
+                        selected: _filter == filter,
+                        onSelected: (_) => setState(() => _filter = filter),
                       ),
                     ),
-                  ],
-                ),
-              )
-            : ListView.separated(
-                padding: const EdgeInsets.only(top: 8, bottom: 88),
-                itemCount: chats.length,
-                separatorBuilder: (_, _) => Divider(
-                  height: 1,
-                  thickness: 0.5,
-                  indent: 88,
-                  endIndent: 16,
-                  color: colors.subtleDivider,
-                ),
-                itemBuilder: (context, index) =>
-                    _tile(context, orderedChats[index]),
+                ],
               ),
+            ),
+            Expanded(
+              child: chats.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.search_off,
+                            size: 48,
+                            color: colors.onSurfaceVariant,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'No chats found',
+                            style: TextStyle(
+                              color: colors.onSurfaceVariant,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.only(top: 8, bottom: 88),
+                      itemCount: chats.length,
+                      separatorBuilder: (_, _) => Divider(
+                        height: 1,
+                        thickness: 0.5,
+                        indent: 88,
+                        endIndent: 16,
+                        color: colors.subtleDivider,
+                      ),
+                      itemBuilder: (context, index) =>
+                          _tile(context, orderedChats[index]),
+                    ),
+            ),
+          ],
+        ),
       ),
-      floatingActionButton: FloatingActionButton(
-        tooltip: 'New message',
-        shape: const CircleBorder(),
-        backgroundColor: colors.primary,
-        foregroundColor: colors.onPrimary,
-        elevation: 2,
-        onPressed: () => _open(const NewChatScreen()),
-        child: const Icon(Icons.edit, size: 25),
-      ),
+      floatingActionButton: MediaQuery.sizeOf(context).width >= 600
+          ? GradientFab.extended(
+              tooltip: 'New message',
+              onPressed: () => _open(const NewChatScreen()),
+              icon: const Icon(Icons.edit_outlined),
+              label: const Text('New message'),
+            )
+          : GradientFab(
+              tooltip: 'New message',
+              onPressed: () => _open(const NewChatScreen()),
+              child: const Icon(Icons.edit, size: 25),
+            ),
     );
   }
 
   Widget _tile(BuildContext context, DemoChat chat) {
     final colors = AppTheme.colorsOf(context);
     final group = _groups?.find(chat.id);
-    final secondary = colors.onSurfaceVariant;
+    final isSelected = widget.selectedChatId == chat.id;
+    final secondary = isSelected
+        ? colors.onPrimaryContainer
+        : colors.onSurfaceVariant;
     return Material(
-      color: colors.surface,
+      color: isSelected ? colors.primaryContainer : Colors.transparent,
       child: InkWell(
         onLongPress: () async {
           final data = AccountDataScope.maybeOf(context);
           if (data == null || !data.loaded || data.error != null) return;
-          final action = await showModalBottomSheet<String>(
+          final action = await showGradientBottomSheet<String>(
             context: context,
             showDragHandle: true,
             useSafeArea: true,
@@ -234,11 +305,16 @@ class _HomeScreenState extends State<HomeScreen> {
             await performChatListAction(context, chat.id, action);
           }
         },
-        onTap: () => _open(
-          group == null
+        onTap: () {
+          final screen = group == null
               ? ChatScreen(chatId: chat.id, chatName: chat.name)
-              : GroupChatScreen(store: _groups!, groupId: group.id),
-        ),
+              : GroupChatScreen(store: _groups!, groupId: group.id);
+          if (widget.onConversationSelected != null) {
+            widget.onConversationSelected!(chat.id, screen);
+          } else {
+            _open(screen);
+          }
+        },
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           child: Row(
@@ -271,7 +347,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         if (chat.group) ...[
                           Icon(
-                            Icons.group,
+                            group?.isChannel == true
+                                ? Icons.campaign_outlined
+                                : Icons.group,
                             size: 17,
                             color: colors.onSurfaceVariant,
                           ),
@@ -282,11 +360,15 @@ class _HomeScreenState extends State<HomeScreen> {
                             chat.name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w600,
-                              color: colors.onSurface,
-                            ),
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
+                                  fontWeight: isSelected
+                                      ? FontWeight.w700
+                                      : FontWeight.w600,
+                                  color: isSelected
+                                      ? colors.onPrimaryContainer
+                                      : colors.onSurface,
+                                ),
                           ),
                         ),
                         if (chat.muted) ...[
@@ -308,9 +390,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       chat.message,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: colors.onSurfaceVariant,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: isSelected
+                            ? colors.onPrimaryContainer
+                            : colors.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -333,38 +416,26 @@ class _HomeScreenState extends State<HomeScreen> {
                       ],
                       Text(
                         chat.time,
-                        style: TextStyle(fontSize: 12, color: secondary),
+                        style: Theme.of(
+                          context,
+                        ).textTheme.labelSmall?.copyWith(color: secondary),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
                   if (chat.unread > 0)
-                    Container(
-                      constraints: const BoxConstraints(minWidth: 23),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: chat.muted
-                            ? colors.surfaceContainerHighest
-                            : colors.primary,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        '${chat.unread}',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: chat.muted
-                              ? colors.onSurfaceVariant
-                              : colors.onPrimary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                    Badge(
+                      largeSize: 24,
+                      backgroundColor: chat.muted
+                          ? colors.surfaceContainerHighest
+                          : colors.primary,
+                      textColor: chat.muted
+                          ? colors.onSurfaceVariant
+                          : colors.onPrimary,
+                      label: Text(chat.unread > 99 ? '99+' : '${chat.unread}'),
                     )
                   else
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 24),
                 ],
               ),
             ],

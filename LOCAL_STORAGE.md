@@ -1,5 +1,11 @@
 # Local application data
 
+In local debug mode, the sign-in form prefills `admin@example.com` /
+`admin-password`. Signing in with these reserved test credentials prepares the
+admin account if missing, or updates its old test password while preserving its
+name, phone and data. It does not sign in until code `123456` is verified.
+Other accounts and production/server authentication are unaffected.
+
 The native application opens `telegram.sqlite` in the platform application-support
 directory through `path_provider`. This is outside the source repository.
 Android/iOS use the native sqflite driver; Windows/Linux use SQLite through FFI.

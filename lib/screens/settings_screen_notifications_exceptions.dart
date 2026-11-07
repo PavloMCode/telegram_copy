@@ -1,3 +1,4 @@
+import '../widgets/gradient_surfaces.dart';
 import 'package:flutter/material.dart';
 import '../models/notification_category.dart';
 import '../services/local_group_store.dart';
@@ -95,7 +96,9 @@ class _ExceptionsState extends State<SettingsScreenNotificationsExceptions> {
               .toList();
     available.removeWhere((c) => exceptions.containsKey(c.id));
     final contact =
-        await showModalBottomSheet<({String id, String name, String subtitle})>(
+        await showGradientBottomSheet<
+          ({String id, String name, String subtitle})
+        >(
           context: context,
           showDragHandle: true,
           useSafeArea: true,
@@ -167,8 +170,11 @@ class _ExceptionsState extends State<SettingsScreenNotificationsExceptions> {
             (!_loadingGroups && _groups != null && _groups!.loadError == null));
     final entries = _exceptions().entries.toList();
     final colors = AppTheme.colorsOf(context);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Notification exceptions')),
+    return AppScaffold(
+      appBar: AppBar(
+        flexibleSpace: const GradientHeader(),
+        title: const Text('Notification exceptions'),
+      ),
       body: data != null && !data.loaded
           ? const Center(child: CircularProgressIndicator())
           : ListView(
@@ -256,7 +262,7 @@ class _ExceptionsState extends State<SettingsScreenNotificationsExceptions> {
                   ),
               ],
             ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: GradientFab.extended(
         onPressed: canAdd ? _add : null,
         icon: const Icon(Icons.add),
         label: Text(_saving ? 'Saving…' : 'Add exception'),

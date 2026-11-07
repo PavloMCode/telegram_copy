@@ -109,11 +109,11 @@ void main() {
       expect(store.setting('notify_chats'), isFalse);
       await tester.tap(master);
       await tester.pumpAndSettle();
-      expect(tester.widget<Switch>(chats).onChanged, isNull);
+      expect(tester.widget<SwitchListTile>(chats).onChanged, isNull);
       await tester.tap(master);
       await tester.pumpAndSettle();
-      expect(tester.widget<Switch>(chats).value, isFalse);
-      expect(tester.widget<Switch>(chats).onChanged, isNotNull);
+      expect(tester.widget<SwitchListTile>(chats).value, isFalse);
+      expect(tester.widget<SwitchListTile>(chats).onChanged, isNotNull);
       await tester.tap(find.text('Notification exceptions'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Add exception'));

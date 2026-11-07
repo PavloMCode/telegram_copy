@@ -10,8 +10,8 @@ class ChatDateSeparator extends StatelessWidget {
     final colors = AppTheme.colorsOf(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: ChatLayout.space12),
-      child: SizedBox(
-        height: ChatLayout.dateHeight,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: ChatLayout.dateHeight),
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: colors.secondaryContainer,
@@ -20,6 +20,7 @@ class ChatDateSeparator extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: ChatLayout.dateHorizontalPadding,
+              vertical: 4,
             ),
             child: Center(
               widthFactor: 1,

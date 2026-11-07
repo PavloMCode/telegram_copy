@@ -1,3 +1,4 @@
+import 'gradient_surfaces.dart';
 import 'package:flutter/material.dart';
 import '../data/demo_data.dart';
 
@@ -35,7 +36,7 @@ class _ContactEditorDialogState extends State<_ContactEditorDialog> {
   }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
+  Widget build(BuildContext context) => GradientAlertDialog(
     title: Text(widget.contact == null ? 'Add contact' : 'Edit contact'),
     content: SingleChildScrollView(
       child: Form(

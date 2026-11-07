@@ -38,9 +38,7 @@ void main() {
   ) async {
     await openCreation(tester, 'New group');
     expect(
-      tester
-          .widget<FloatingActionButton>(find.byType(FloatingActionButton))
-          .onPressed,
+      tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
       isNull,
     );
     await tester.tap(find.text('Anna'));

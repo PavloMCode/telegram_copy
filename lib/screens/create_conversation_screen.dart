@@ -1,8 +1,10 @@
+import '../widgets/gradient_surfaces.dart';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import '../widgets/form_action.dart';
 import '../data/demo_data.dart';
 import '../services/profile_photo_picker.dart';
 import 'chat_screen.dart';
@@ -65,8 +67,9 @@ class _ContactPickerState extends State<_ContactPicker> {
     final contacts = allContacts
         .where((contact) => contact.name.toLowerCase().contains(query))
         .toList();
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(
+        flexibleSpace: const GradientHeader(),
         title: Text(widget.group ? 'New group' : 'New message'),
         bottom: widget.group
             ? PreferredSize(
@@ -75,7 +78,9 @@ class _ContactPickerState extends State<_ContactPicker> {
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Text(
                     '${_selected.length} members selected',
-                    style: TextStyle(color: colors.onPrimary),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
                   ),
                 ),
               )
@@ -179,50 +184,65 @@ class _ContactPickerState extends State<_ContactPicker> {
                       child: Center(child: Text('No contacts found')),
                     ),
                   for (final contact in contacts)
-                    ListTile(
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 4,
+                    if (widget.group)
+                      CheckboxListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 4,
+                        ),
+                        secondary: CircleAvatar(
+                          child: Text(contact.name.characters.first),
+                        ),
+                        title: Text(contact.name),
+                        subtitle: Text(contact.status),
+                        value: _selected.contains(contact.id),
+                        onChanged: (selected) => setState(() {
+                          if (selected == true) {
+                            _selected.add(contact.id);
+                          } else {
+                            _selected.remove(contact.id);
+                          }
+                        }),
+                      )
+                    else
+                      ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 4,
+                        ),
+                        leading: CircleAvatar(
+                          radius: 25,
+                          backgroundColor: colors.primaryContainer,
+                          foregroundColor: colors.onPrimaryContainer,
+                          child: Text(contact.name.characters.first),
+                        ),
+                        title: Text(contact.name),
+                        subtitle: Text(contact.status),
+                        onTap: () {
+                          if (widget.group) {
+                            setState(() {
+                              if (!_selected.add(contact.id)) {
+                                _selected.remove(contact.id);
+                              }
+                            });
+                          } else {
+                            _openConversation(
+                              context,
+                              contact.id,
+                              contact.name,
+                            );
+                          }
+                        },
                       ),
-                      leading: CircleAvatar(
-                        radius: 25,
-                        backgroundColor: colors.primaryContainer,
-                        foregroundColor: colors.onPrimaryContainer,
-                        child: Text(contact.name.characters.first),
-                      ),
-                      title: Text(contact.name),
-                      subtitle: Text(contact.status),
-                      trailing: widget.group
-                          ? Icon(
-                              _selected.contains(contact.id)
-                                  ? Icons.check_circle
-                                  : Icons.radio_button_unchecked,
-                              color: _selected.contains(contact.id)
-                                  ? colors.primary
-                                  : colors.outline,
-                            )
-                          : null,
-                      onTap: () {
-                        if (widget.group) {
-                          setState(() {
-                            if (!_selected.add(contact.id)) {
-                              _selected.remove(contact.id);
-                            }
-                          });
-                        } else {
-                          _openConversation(context, contact.id, contact.name);
-                        }
-                      },
-                    ),
                 ],
               ),
             ),
           ],
         ),
       ),
-      floatingActionButton: widget.group
-          ? FloatingActionButton(
-              tooltip: 'Next',
+      bottomNavigationBar: widget.group
+          ? FormAction(
+              label: 'Next',
               onPressed: _selected.isEmpty
                   ? null
                   : () {
@@ -236,13 +256,7 @@ class _ContactPickerState extends State<_ContactPicker> {
                         ),
                       );
                     },
-              backgroundColor: _selected.isEmpty
-                  ? colors.surfaceContainerHighest
-                  : colors.primary,
-              foregroundColor: _selected.isEmpty
-                  ? colors.onSurfaceVariant
-                  : colors.onPrimary,
-              child: const Icon(Icons.arrow_forward),
+              icon: Icons.arrow_forward,
             )
           : null,
     );
@@ -351,8 +365,11 @@ class _ConversationDetailsState extends State<_ConversationDetails> {
   @override
   Widget build(BuildContext context) {
     final colors = AppTheme.colorsOf(context);
-    return Scaffold(
-      appBar: AppBar(title: Text(widget.channel ? 'New channel' : 'New group')),
+    return AppScaffold(
+      appBar: AppBar(
+        flexibleSpace: const GradientHeader(),
+        title: Text(widget.channel ? 'New channel' : 'New group'),
+      ),
       body: SafeArea(
         child: Form(
           key: _form,
@@ -445,10 +462,10 @@ class _ConversationDetailsState extends State<_ConversationDetails> {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        tooltip: widget.channel ? 'Next' : 'Create group',
+      bottomNavigationBar: FormAction(
+        label: widget.channel ? 'Next' : 'Create group',
         onPressed: _picking || _saving ? null : _next,
-        child: Icon(widget.channel ? Icons.arrow_forward : Icons.check),
+        icon: widget.channel ? Icons.arrow_forward : Icons.check,
       ),
     );
   }
@@ -481,8 +498,11 @@ class _ChannelTypeScreenState extends State<_ChannelTypeScreen> {
   @override
   Widget build(BuildContext context) {
     final colors = AppTheme.colorsOf(context);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Channel type')),
+    return AppScaffold(
+      appBar: AppBar(
+        flexibleSpace: const GradientHeader(),
+        title: const Text('Channel type'),
+      ),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 24, 20, 100),
@@ -495,27 +515,31 @@ class _ChannelTypeScreenState extends State<_ChannelTypeScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            for (final type in _ChannelType.values)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(
-                  _type == type
-                      ? Icons.radio_button_checked
-                      : Icons.radio_button_off,
-                  color: _type == type ? colors.primary : colors.outline,
-                ),
-                title: Text(
-                  type == _ChannelType.public
-                      ? 'Public channel'
-                      : 'Private channel',
-                ),
-                subtitle: Text(
-                  type == _ChannelType.public
-                      ? 'Anyone can find your channel in search and join.'
-                      : 'People can join only if they are added or have an invite link.',
-                ),
-                onTap: () => setState(() => _type = type),
+            RadioGroup<_ChannelType>(
+              groupValue: _type,
+              onChanged: (value) {
+                if (value != null) setState(() => _type = value);
+              },
+              child: Column(
+                children: [
+                  for (final type in _ChannelType.values)
+                    RadioListTile<_ChannelType>(
+                      value: type,
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        type == _ChannelType.public
+                            ? 'Public channel'
+                            : 'Private channel',
+                      ),
+                      subtitle: Text(
+                        type == _ChannelType.public
+                            ? 'Anyone can find your channel in search and join.'
+                            : 'People can join only if they are added or have an invite link.',
+                      ),
+                    ),
+                ],
               ),
+            ),
             const Divider(height: 32),
             if (_type == _ChannelType.public) ...[
               ListTile(
@@ -540,8 +564,8 @@ class _ChannelTypeScreenState extends State<_ChannelTypeScreen> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        tooltip: 'Create channel',
+      bottomNavigationBar: FormAction(
+        label: 'Create channel',
         onPressed: _saving
             ? null
             : () async {
@@ -575,7 +599,7 @@ class _ChannelTypeScreenState extends State<_ChannelTypeScreen> {
                   if (mounted) setState(() => _saving = false);
                 }
               },
-        child: const Icon(Icons.check),
+        icon: Icons.check,
       ),
     );
   }

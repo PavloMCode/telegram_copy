@@ -1,3 +1,4 @@
+import '../widgets/gradient_surfaces.dart';
 import 'package:flutter/material.dart';
 
 import '../data/demo_data.dart';
@@ -46,7 +47,7 @@ class _SettingsScreenPrivacyState extends State<SettingsScreenPrivacy> {
 
   Future<void> _choose(String key, String title) async {
     final current = _values[key] ?? 'My contacts';
-    final result = await showModalBottomSheet<String>(
+    final result = await showGradientBottomSheet<String>(
       context: context,
       showDragHandle: true,
       useSafeArea: true,
@@ -135,8 +136,11 @@ class _SettingsScreenPrivacyState extends State<SettingsScreenPrivacy> {
   @override
   Widget build(BuildContext context) {
     final colors = AppTheme.colorsOf(context);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Privacy')),
+    return AppScaffold(
+      appBar: AppBar(
+        flexibleSpace: const GradientHeader(),
+        title: const Text('Privacy'),
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
         children: [
@@ -240,7 +244,7 @@ class SettingsScreenBlockedUsers extends StatelessWidget {
     final available = data.contacts
         .where((contact) => !contacts.isBlocked(contact.id))
         .toList();
-    final selected = await showModalBottomSheet<DemoContact>(
+    final selected = await showGradientBottomSheet<DemoContact>(
       context: context,
       showDragHandle: true,
       useSafeArea: true,
@@ -296,8 +300,11 @@ class SettingsScreenBlockedUsers extends StatelessWidget {
               .where((contact) => contacts.isBlocked(contact.id))
               .toList();
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Blocked users')),
+    return AppScaffold(
+      appBar: AppBar(
+        flexibleSpace: const GradientHeader(),
+        title: const Text('Blocked users'),
+      ),
       body: blocked.isEmpty
           ? Center(
               child: Padding(
@@ -349,7 +356,7 @@ class SettingsScreenBlockedUsers extends StatelessWidget {
             ),
       floatingActionButton: data == null || contacts == null
           ? null
-          : FloatingActionButton.extended(
+          : GradientFab.extended(
               onPressed: () => _addBlockedUser(context, data, contacts),
               icon: const Icon(Icons.person_add_alt_1_outlined),
               label: const Text('Block user'),

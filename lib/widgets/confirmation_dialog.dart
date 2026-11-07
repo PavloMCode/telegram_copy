@@ -1,3 +1,4 @@
+import 'gradient_surfaces.dart';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
@@ -11,7 +12,7 @@ Future<bool> showConfirmationDialog(
 }) async =>
     await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => GradientAlertDialog(
         title: Text(title),
         content: Text(message),
         actions: [

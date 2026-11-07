@@ -1,9 +1,10 @@
+import 'gradient_surfaces.dart';
 import 'package:flutter/material.dart';
 
 Future<void> showContactCallDialog(BuildContext context, String name) =>
     showDialog<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => GradientAlertDialog(
         icon: const Icon(Icons.call_outlined),
         title: Text('Call $name'),
         content: const Text(

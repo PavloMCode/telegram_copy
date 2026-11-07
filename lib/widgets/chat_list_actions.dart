@@ -47,7 +47,30 @@ Future<bool> performChatListAction(
       await data.deleteConversation(id);
       return true;
     }
-    await data.setChatPinned(id, !data.isChatPinned(id));
+    final previous = data.isChatPinned(id);
+    await data.setChatPinned(id, !previous);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(previous ? 'Chat unpinned' : 'Chat pinned'),
+          action: SnackBarAction(
+            label: 'Undo',
+            onPressed: () async {
+              if (!context.mounted) return;
+              try {
+                await data.setChatPinned(id, previous);
+              } catch (_) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Could not undo the change.')),
+                  );
+                }
+              }
+            },
+          ),
+        ),
+      );
+    }
   } catch (_) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

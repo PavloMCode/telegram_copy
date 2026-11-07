@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import '../theme/app_gradients.dart';
 import 'profile_scope.dart';
 import 'account_data_scope.dart';
 
@@ -23,16 +24,7 @@ class DrawerProfileHeader extends StatelessWidget {
         .join();
 
     return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            colors.primary,
-            Color.lerp(colors.primary, colors.primaryContainer, 0.22)!,
-          ],
-        ),
-      ),
+      decoration: BoxDecoration(gradient: AppGradients.header(colors)),
       child: SafeArea(
         bottom: false,
         child: ConstrainedBox(
@@ -49,8 +41,8 @@ class DrawerProfileHeader extends StatelessWidget {
                         ? 'Switch to light theme'
                         : 'Switch to dark theme',
                     style: IconButton.styleFrom(
-                      backgroundColor: colors.onPrimary.withValues(alpha: 0.12),
-                      foregroundColor: colors.onPrimary,
+                      backgroundColor: colors.secondaryContainer,
+                      foregroundColor: colors.onSurface,
                       minimumSize: const Size(44, 44),
                       shape: const CircleBorder(),
                     ),
@@ -89,9 +81,7 @@ class DrawerProfileHeader extends StatelessWidget {
                       padding: const EdgeInsets.all(3),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        border: Border.all(
-                          color: colors.onPrimary.withValues(alpha: 0.28),
-                        ),
+                        border: Border.all(color: colors.outlineVariant),
                       ),
                       child: CircleAvatar(
                         backgroundImage: photo == null
@@ -131,7 +121,7 @@ class DrawerProfileHeader extends StatelessWidget {
                               fontSize: 20,
                               height: 1.25,
                               fontWeight: FontWeight.w600,
-                              color: colors.onPrimary,
+                              color: colors.onSurface,
                             ),
                           ),
                           const SizedBox(height: 5),
@@ -142,7 +132,7 @@ class DrawerProfileHeader extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 15,
                               height: 1.3,
-                              color: colors.onPrimary.withValues(alpha: 0.82),
+                              color: colors.onSurfaceVariant,
                             ),
                           ),
                         ],

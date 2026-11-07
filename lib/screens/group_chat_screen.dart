@@ -1,3 +1,4 @@
+import '../widgets/gradient_surfaces.dart';
 import 'dart:async';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -246,7 +247,7 @@ class _GroupChatScreenState extends State<GroupChatScreen>
     final result = await showDialog<String>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, updateDialog) => AlertDialog(
+        builder: (dialogContext, updateDialog) => GradientAlertDialog(
           title: const Text('Edit message'),
           content: SizedBox(
             width: 400,
@@ -368,18 +369,22 @@ class _GroupChatScreenState extends State<GroupChatScreen>
     builder: (context, _) {
       final group = widget.store.find(widget.groupId);
       if (group == null) {
-        return Scaffold(
-          appBar: AppBar(title: const Text('Group')),
+        return AppScaffold(
+          appBar: AppBar(
+            flexibleSpace: const GradientHeader(),
+            title: const Text('Group'),
+          ),
           body: const Center(child: Text('This group is no longer available.')),
         );
       }
       final colors = AppTheme.colorsOf(context);
       final data = AccountDataScope.maybeOf(context);
-      return Scaffold(
+      return AppScaffold(
         appBar: AppBar(
+          flexibleSpace: const GradientHeader(),
           elevation: 0,
           scrolledUnderElevation: 0,
-          toolbarHeight: ChatLayout.appBarHeight,
+          toolbarHeight: ChatLayout.appBarHeightFor(context),
           titleSpacing: ChatLayout.space16,
           actionsPadding: const EdgeInsets.only(right: ChatLayout.space16),
           title: ChatHeaderTitle(
@@ -393,7 +398,7 @@ class _GroupChatScreenState extends State<GroupChatScreen>
             IconButton(
               tooltip: 'Group settings',
               onPressed: _details,
-              icon: Icon(Icons.info_outline, color: colors.onPrimary),
+              icon: Icon(Icons.info_outline, color: colors.onSurfaceVariant),
             ),
             PopupMenuButton<String>(
               tooltip: 'Chat options',

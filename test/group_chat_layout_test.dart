@@ -38,15 +38,15 @@ void main() {
       expect(tester.getSize(find.byType(CircleAvatar)).width, 36);
       expect(
         tester.getSize(find.byKey(const ValueKey('chat-composer'))).height,
-        64,
+        72,
       );
       expect(
         tester.getSize(find.byKey(const ValueKey('chat-input'))).height,
-        48,
+        56,
       );
       expect(
         tester.getSize(find.byKey(const ValueKey('chat-send'))),
-        const Size(44, 44),
+        const Size(48, 48),
       );
       final text = List.filled(
         3,
@@ -68,7 +68,7 @@ void main() {
           .first;
       expect(tester.getSize(bubble).width, closeTo(width * .72, .01));
       expect(width - tester.getRect(bubble).right, closeTo(12, .01));
-      expect(tester.widget<Text>(find.text(text)).style!.fontSize, 14);
+      expect(tester.widget<Text>(find.text(text)).style!.fontSize, 16);
       expect(find.text('Today'), findsOneWidget);
       expect(find.byTooltip('Sent'), findsOneWidget);
       await store.send(id, '', const [

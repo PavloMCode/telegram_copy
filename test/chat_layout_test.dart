@@ -35,17 +35,29 @@ void main() {
       expect(tester.widget<Text>(find.text('Anna')).style!.fontSize, 16);
       expect(
         tester.widget<Text>(find.text('Local chat · offline')).style!.fontSize,
-        11,
+        12,
       );
 
       final composer = find.byKey(const ValueKey('chat-composer'));
       final input = find.byKey(const ValueKey('chat-input'));
       final send = find.byKey(const ValueKey('chat-send'));
-      expect(tester.getSize(composer).height, 64);
-      expect(tester.getSize(input).height, 48);
-      expect(tester.getSize(send), const Size(44, 44));
+      expect(tester.getSize(composer).height, 72);
+      expect(tester.getSize(input).height, 56);
+      expect(tester.getSize(send), const Size(48, 48));
       final inputRect = tester.getRect(input);
       final sendRect = tester.getRect(send);
+      expect(
+        tester.getRect(find.byTooltip('Emoji')).center.dy,
+        closeTo(sendRect.center.dy, 1),
+      );
+      expect(
+        tester.getRect(find.byTooltip('Attach files')).center.dy,
+        closeTo(sendRect.center.dy, 1),
+      );
+      expect(
+        tester.getRect(find.byType(EditableText)).center.dy,
+        closeTo(sendRect.center.dy, 1),
+      );
       expect(inputRect.left, 8);
       expect(sendRect.left - inputRect.right, 8);
       expect(width - sendRect.right, 8);
@@ -71,7 +83,7 @@ void main() {
       final messageRect = tester.getRect(find.text(longMessage));
       expect(messageRect.left - firstRect.left, closeTo(12, 0.01));
       expect(messageRect.top - firstRect.top, closeTo(8, 0.01));
-      expect(tester.widget<Text>(find.text(longMessage)).style!.fontSize, 14);
+      expect(tester.widget<Text>(find.text(longMessage)).style!.fontSize, 16);
 
       final decoration =
           tester.widget<DecoratedBox>(firstBubble).decoration
@@ -86,15 +98,15 @@ void main() {
       final date = find
           .ancestor(of: find.text('Today'), matching: find.byType(DecoratedBox))
           .first;
-      expect(tester.getSize(date).height, 24);
-      expect(tester.widget<Text>(find.text('Today')).style!.fontSize, 10);
+      expect(tester.getSize(date).height, 28);
+      expect(tester.widget<Text>(find.text('Today')).style!.fontSize, 12);
 
       final time = find.byWidgetPredicate(
         (widget) =>
             widget is Text &&
             RegExp(r'^\d{2}:\d{2}$').hasMatch(widget.data ?? ''),
       );
-      expect(tester.widget<Text>(time).style!.fontSize, 10);
+      expect(tester.widget<Text>(time).style!.fontSize, 12);
       expect(tester.getRect(time).top - messageRect.bottom, closeTo(4, 0.01));
 
       await tester.enterText(find.byType(TextField), 'Next message');
@@ -114,8 +126,8 @@ void main() {
       await tester.tap(find.byTooltip('Send message'));
       await tester.pumpAndSettle();
       expect(find.text(multiline), findsOneWidget);
-      expect(tester.getSize(input).height, 48);
-      expect(tester.getSize(composer).height, 64);
+      expect(tester.getSize(input).height, 56);
+      expect(tester.getSize(composer).height, 72);
       expect(tester.takeException(), isNull);
     });
   }
@@ -214,8 +226,8 @@ void main() {
 
     await tester.enterText(find.byType(TextField), 'Short');
     await tester.pumpAndSettle();
-    expect(tester.getSize(input).height, 48);
-    expect(tester.getSize(composer).height, 64);
+    expect(tester.getSize(input).height, 56);
+    expect(tester.getSize(composer).height, 72);
     expect(tester.getRect(composer).bottom, bottom);
     expect(tester.takeException(), isNull);
   });

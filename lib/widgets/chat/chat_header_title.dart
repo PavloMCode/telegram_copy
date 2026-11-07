@@ -24,8 +24,8 @@ class ChatHeaderTitle extends StatelessWidget {
       children: [
         CircleAvatar(
           radius: ChatLayout.avatarSize / 2,
-          backgroundColor: colors.primaryContainer,
-          foregroundColor: colors.onPrimaryContainer,
+          backgroundColor: colors.surfaceContainerLowest,
+          foregroundColor: colors.primary,
           backgroundImage: photo,
           child: photo != null
               ? null
@@ -60,7 +60,7 @@ class ChatHeaderTitle extends StatelessWidget {
                 style: TextStyle(
                   fontSize: ChatLayout.statusFontSize,
                   height: 1.2,
-                  color: colors.onPrimaryMuted,
+                  color: colors.onSurfaceVariant,
                 ),
               ),
             ],

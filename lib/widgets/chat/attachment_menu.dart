@@ -1,3 +1,4 @@
+import '../gradient_surfaces.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
@@ -7,7 +8,7 @@ Future<FileType?> showAttachmentMenu(
   BuildContext context, {
   bool includeAudio = false,
 }) {
-  return showModalBottomSheet<FileType>(
+  return showGradientBottomSheet<FileType>(
     context: context,
     showDragHandle: true,
     useSafeArea: true,
@@ -54,9 +55,22 @@ Future<FileType?> showAttachmentMenu(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                'Attach',
-                style: Theme.of(sheetContext).textTheme.titleLarge,
+              Row(
+                children: [
+                  const SizedBox(width: 48),
+                  Expanded(
+                    child: Text(
+                      'Attach',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(sheetContext).textTheme.titleLarge,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Close attachments',
+                    onPressed: () => Navigator.pop(sheetContext),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
               ),
               const SizedBox(height: 8),
               Text(

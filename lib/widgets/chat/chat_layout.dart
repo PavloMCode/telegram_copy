@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 abstract final class ChatLayout {
   static const space4 = 4.0;
   static const space8 = 8.0;
@@ -6,26 +8,31 @@ abstract final class ChatLayout {
   static const space24 = 24.0;
 
   static const appBarHeight = 64.0;
+  static double appBarHeightFor(BuildContext context) =>
+      (MediaQuery.textScalerOf(context).scale(nameFontSize + statusFontSize) *
+                  1.2 +
+              16)
+          .clamp(appBarHeight, double.infinity);
   static const avatarSize = 36.0;
   static const nameFontSize = 16.0;
-  static const statusFontSize = 11.0;
+  static const statusFontSize = 12.0;
   static const bubbleWidthFraction = 0.72;
   static const bubbleRadius = 16.0;
   static const bubbleTailCornerRadius = 6.0;
   static const tailWidth = 10.0;
   static const tailHeight = 8.0;
-  static const messageFontSize = 14.0;
-  static const timeFontSize = 10.0;
+  static const messageFontSize = 16.0;
+  static const timeFontSize = 12.0;
   static const bubbleGap = 6.0;
-  static const dateHeight = 24.0;
+  static const dateHeight = 28.0;
   static const dateHorizontalPadding = 10.0;
-  static const dateRadius = 12.0;
-  static const dateFontSize = 10.0;
-  static const minComposerHeight = 64.0;
-  static const minInputHeight = 48.0;
+  static const dateRadius = 14.0;
+  static const dateFontSize = 12.0;
+  static const minComposerHeight = 72.0;
+  static const minInputHeight = 56.0;
   static const maxInputLines = 6;
   static const inputRadius = 24.0;
   static const iconSize = 22.0;
-  static const sendButtonSize = 44.0;
-  static const sendButtonRadius = 22.0;
+  static const sendButtonSize = 48.0;
+  static const sendButtonRadius = 24.0;
 }

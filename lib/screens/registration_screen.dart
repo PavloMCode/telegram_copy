@@ -1,3 +1,4 @@
+import '../widgets/gradient_surfaces.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -65,6 +66,13 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   void _go(_AuthStep step) {
     FocusScope.of(context).unfocus();
+    if (step == _AuthStep.login && kDebugMode && _auth is LocalAuthApi) {
+      if (_email.text.isEmpty) _email.text = LocalAuthApi.testAdminEmail;
+      if (_email.text == LocalAuthApi.testAdminEmail &&
+          _password.text.isEmpty) {
+        _password.text = LocalAuthApi.testAdminPassword;
+      }
+    }
     setState(() {
       _step = step;
       _error = null;
@@ -353,8 +361,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) _back();
       },
-      child: Scaffold(
+      child: AppScaffold(
         appBar: AppBar(
+          flexibleSpace: const GradientHeader(),
           automaticallyImplyLeading: false,
           backgroundColor: colors.surface,
           foregroundColor: colors.onSurface,
@@ -385,9 +394,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     ScrollViewKeyboardDismissBehavior.onDrag,
                 children: [
                   Center(
-                    child: CircleAvatar(
+                    child: GradientMark(
                       radius: 48,
-                      backgroundColor: colors.primary,
                       child: Icon(
                         _step == _AuthStep.code
                             ? Icons.mark_email_read_outlined
@@ -458,10 +466,13 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     ),
                     onPressed: _busy ? null : _continue,
                     child: _busy
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 22,
                             height: 22,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: colors.onPrimary,
+                            ),
                           )
                         : Text(
                             _step == _AuthStep.code
